@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "991750073976",
+    "project_id": "roomly-split-expense",
+    "storage_bucket": "roomly-split-expense.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:991750073976:android:0f6325a8c48dfcc32b878d",
+        "android_client_info": {
+          "package_name": "com.example.roomly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYRxLLdc6Mp44698iYmJ-RWRxb7jGQUmc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

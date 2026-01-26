@@ -1,91 +1,134 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../widgets/animated_logo.dart';
-import '../widgets/login_form.dart';
-import '../widgets/social_button.dart';
+import 'package:roomly/features/auth/presentations/pages/register_page.dart';
+import 'package:roomly/features/auth/presentations/widgets/login_form.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
-}
-
-class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.3, 1.0, curve: Curves.easeIn)),
-    );
-
-    _slideAnimation = Tween<double>(begin: 50, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
-    );
-
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: Colors.grey[300],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
-      child: Scaffold(
-        body: Container(
-          height: size.height,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                theme.colorScheme.primary.withOpacity(0.9),
-                theme.colorScheme.primary,
-                theme.colorScheme.primaryContainer,
-              ],
-            ),
-          ),
-          child: SingleChildScrollView(
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
+              // logo
+              const Icon(Icons.lock_outline, size: 70),
+
+              const SizedBox(height: 16),
+
+              // title
+              Text(
+                'Welcome back ',
+                style: TextStyle(
+                  color: Colors.grey.shade800,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Sign in to continue',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+
+              const SizedBox(height: 40),
+
+              // login form
+               LoginForm(),
+
+              const SizedBox(height: 25),
+
+              // divider
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25),
+                child: Row(
                   children: [
-                    const SizedBox(height: 60),
-                    AnimatedLogo(controller: _controller, fadeAnimation: _fadeAnimation, slideAnimation: _slideAnimation),
-                    const SizedBox(height: 60),
-                    LoginForm(controller: _controller, fadeAnimation: _fadeAnimation, slideAnimation: _slideAnimation),
-                    const SizedBox(height: 40),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        // SocialButton(iconPath: 'assets/google.png', label: 'Google'),
-                        // SizedBox(width: 16),
-                        // SocialButton(iconPath: 'assets/apple.png', label: 'Apple'),
-                      ],
+                    Expanded(child: Divider(color: Colors.grey.shade400)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        'Or continue with',
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
                     ),
-                    const SizedBox(height: 24),
+                    Expanded(child: Divider(color: Colors.grey.shade400)),
                   ],
                 ),
               ),
-            ),
+              const SizedBox(height: 30),
+
+
+              // Google Sign In button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: OutlinedButton(
+                  onPressed: () {},
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.grey.shade800,
+                    side: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset('assets/google.png', height: 20),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Continue with Google',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height:10),
+
+              // Register text
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Don't have an account? ",
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RegisterPage(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Register',
+                      style: TextStyle(
+                        color: Color(0xFF4F46E5),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+
+            ],
           ),
         ),
       ),

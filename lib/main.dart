@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'features/auth/presentations/pages/login_page.dart';
 import 'features/expenses/presentations/pages/new_expense_app.dart';
-import 'features/home/presentation/pages/main_app.dart';
 import 'features/groups/presentation/pages/groups_page.dart';
-import 'features/groups/presentation/pages/group_detail_page.dart';
+import 'features/home/presentation/pages/main_dashboard.dart';
+
 
 
 void main() {
@@ -24,10 +24,9 @@ class SplitEaseApp extends StatelessWidget {
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginPage(),
-        '/main': (context) => const MainApp(),
+        '/main': (context) => const MainDashboard(),
         '/groups': (context) => const GroupsPage(),
-        '/group_detail': (context) => const GroupDetailPage(),
-        '/new_expense': (context) => const NewExpensePage(),
+       '/new_expense': (context) => const NewExpensePage(),
       },
     );
   }

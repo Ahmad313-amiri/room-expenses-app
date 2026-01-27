@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:roomly/features/dashboard/presentation/pages/main_dashboard.dart';
+import 'package:roomly/features/home/presentation/pages/botton_nav_bar.dart';
+import 'package:roomly/features/home/presentation/pages/main_dashboard.dart';
 import 'package:roomly/features/home/presentation/pages/home_page.dart';
 import '../pages/register_page.dart';
 import 'my_textfield.dart';
@@ -28,7 +29,7 @@ class _LoginFormState extends State<LoginForm> {
     if (_formKey.currentState!.validate()) {
            Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) =>  MainDashboard()),
+        MaterialPageRoute(builder: (_) =>  BottomNavBar()),
       );
 
       debugPrint('Username: ${_usernameController.text}');

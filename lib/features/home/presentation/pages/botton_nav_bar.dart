@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:roomly/features/groups/presentation/pages/create_group.dart';
 import 'package:roomly/features/groups/presentation/pages/groups_page.dart';
 import 'package:roomly/features/home/presentation/pages/activity_page.dart';
 import 'package:roomly/features/home/presentation/pages/main_dashboard.dart';
@@ -17,15 +18,16 @@ class _BottomNavBarState extends State<BottomNavBar> {
 
   final List<Widget> _pages = const [
     MainDashboard(),
-    ActivityPage(),
+    // CreateGroupScreen(),
     GroupsPage(),
+    ActivityPage(),
     SettingPage(),
   ];
 
   final List<BottomNavItem> _navItems = const [
     BottomNavItem(icon: Icons.dashboard, label: 'Dashboard'),
-    BottomNavItem(icon: Icons.notifications, label: 'Activity'),
     BottomNavItem(icon: Icons.group, label: 'Groups'),
+    BottomNavItem(icon: Icons.notifications, label: 'Activity'),
     BottomNavItem(icon: Icons.settings, label: 'Settings'),
   ];
 
@@ -48,7 +50,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
       onTap: _onItemTapped,
       color: Colors.blue,
       backgroundColor: Colors.transparent,
-      buttonBackgroundColor: Colors.orange.withValues(alpha: 0.8),
+      buttonBackgroundColor: Colors.blueAccent.withValues(alpha: 0.8),
       animationCurve: Curves.easeInOut,
       animationDuration: const Duration(milliseconds: 300),
       height: 60,

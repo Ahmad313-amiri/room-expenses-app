@@ -1,195 +1,179 @@
 import 'package:flutter/material.dart';
 
-/// Add Group Expense Screen
-/// Allows the user to enter a new group expense, select a split method,
-/// and see the net balance impact for each member.
-class AddExpenseScreen extends StatefulWidget {
-  const AddExpenseScreen({super.key});
-
-  @override
-  State<AddExpenseScreen> createState() => _AddExpenseScreenState();
-}
-
-class _AddExpenseScreenState extends State<AddExpenseScreen> {
-  int selectedTabIndex = 0; // 0: Equally, 1: Custom, 2: Percentage, 3: Share
+/// Equal Split Content
+/// Use this inside your existing tab view for the "Equal" tab
+class EqualSplitContent extends StatelessWidget {
+  const EqualSplitContent({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        leading: TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close', style: TextStyle(color: Colors.blue)),
-        ),
-        title: const Text('New Expense', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        actions: [
-          TextButton(
-            onPressed: () {},
-            child: const Text('Save', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-          )
-        ],
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildAmountSection(),
-            const SizedBox(height: 32),
-            _buildInputLabel('REASON *'),
-            _buildTextField('e.g. Dinner at Alpine Lodge'),
-            const SizedBox(height: 20),
-            _buildInputLabel('SPLIT METHOD'),
-            _buildSplitTabs(),
-            const SizedBox(height: 32),
-            _buildInputLabel('NET BALANCE IMPACT'),
-            _buildImpactList(),
-            const SizedBox(height: 120), // Space for bottom sheet
-          ],
-        ),
-      ),
-      bottomSheet: _buildStickyFooter(),
-    );
-  }
+    // Mock data based on your design
+    final List<Map<String, dynamic>> members = [
+      {'name': 'Alice Miller', 'role': 'Standard Member', 'initials': 'AM', 'color': const Color(0xFFE3F2FD)},
+      {'name': 'Bob Johnson', 'role': 'Payer', 'initials': 'BJ', 'color': const Color(0xFFFFF3E0)},
+      {'name': 'Charlie Reed', 'role': 'Standard Member', 'initials': 'CR', 'color': const Color(0xFFE8F5E9)},
+    ];
 
-  /// Displays total amount input section
-  Widget _buildAmountSection() {
-    return Center(
-      child: Column(
-        children: [
-          const Text(
-            'ENTER TOTAL AMOUNT',
-            style: TextStyle(
-                color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Text('\$', style: TextStyle(fontSize: 32, color: Colors.blue, fontWeight: FontWeight.w300)),
-              Text('120.00', style: TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: Colors.black)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Tabs for selecting split method
-  Widget _buildSplitTabs() {
-    List<String> tabs = ['Equally', 'Custom', 'Percentage', 'Share'];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        children: List.generate(
-          tabs.length,
-              (index) {
-            bool isSelected = selectedTabIndex == index;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => selectedTabIndex = index),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Info banner
+                Container(
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: isSelected
-                        ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
-                        : [],
+                    color: const Color(0xFFF1F6FF),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    tabs[index],
-                    style: TextStyle(
-                      color: isSelected ? Colors.black : Colors.grey,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                  child: Row(
+                    children: const [
+                      Icon(Icons.info, color: Color(0xFF1D5CFF), size: 20),
+                      SizedBox(width: 12),
+                      Text(
+                        'Everyone pays an equal share',
+                        style: TextStyle(color: Color(0xFF1D5CFF), fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Section header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text(
+                      'SPLIT DETAILS',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                        letterSpacing: 0.5,
+                      ),
                     ),
+                    Text(
+                      'USD',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Member list
+                ...members.map((member) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        // Member avatar
+                        CircleAvatar(
+                          backgroundColor: member['color'],
+                          child: Text(
+                            member['initials'],
+                            style: const TextStyle(color: Color(0xFF1D5CFF), fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Name and role
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(member['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              Text(member['role'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        // Amount box
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FA),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            '\$400.00',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        ),
+        // Sticky footer
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Colors.grey.shade100)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Total summary row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Total split amount
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('TOTAL SPLIT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text('\$1,200.00', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2ECC71))),
+                          SizedBox(width: 6),
+                          Icon(Icons.check_circle, color: Color(0xFF2ECC71), size: 20),
+                        ],
+                      ),
+                    ],
+                  ),
+                  // Status
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: const [
+                      Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                      SizedBox(height: 4),
+                      Text('Balanced', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF2ECC71))),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Confirm button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: const Text('Confirm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                  label: const Icon(Icons.check_circle, color: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1D5CFF),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 0,
                   ),
                 ),
               ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  /// List of net impact per member
-  Widget _buildImpactList() {
-    return Column(
-      children: [
-        _buildMemberRow('You', '+80.00', true),
-        _buildMemberRow('Sarah', '-40.00', false),
-        _buildMemberRow('Alex', '-40.00', false),
-      ],
-    );
-  }
-
-  /// Single row showing a member's net shift
-  Widget _buildMemberRow(String name, String impact, bool isPositive) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(16)),
-      child: Row(
-        children: [
-          const CircleAvatar(radius: 20, backgroundColor: Colors.blueGrey),
-          const SizedBox(width: 12),
-          Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold))),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Text('NET SHIFT', style: TextStyle(fontSize: 9, color: Colors.grey)),
-              Text(impact,
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: isPositive ? Colors.green : Colors.red)),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  /// Input label
-  Widget _buildInputLabel(String label) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-  );
-
-  /// Input text field
-  Widget _buildTextField(String hint) => TextField(
-    decoration: InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.grey[50],
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-    ),
-  );
-
-  /// Bottom sticky action button
-  Widget _buildStickyFooter() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFEEEEEE)))),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          child: const Text('Create Expense',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         ),
-      ),
+      ],
     );
   }
 }

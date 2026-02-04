@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:roomly/features/groups/presentation/pages/add_expense.dart';
 import 'package:roomly/features/groups/presentation/pages/advance_settle_screen.dart';
 import 'package:roomly/features/groups/presentation/pages/select_member_screen.dart';
+import 'package:roomly/features/groups/presentation/pages/spilit_method.dart';
 
 // Member data model
 class Member {
@@ -288,7 +289,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.push(context,MaterialPageRoute(builder: (_)=>AddExpenseScreen()));
+                          Navigator.push(context,MaterialPageRoute(builder: (_)=>SplitMethodScreen()));
                         },
                         icon: const Icon(Icons.add_circle_outline, size: 18),
                         label: const Text('Add Expense',

@@ -50,6 +50,8 @@ dev_dependencies:
   firebase_auth:
   cloud_firestore:
   curved_navigation_bar:
+  shimmer:
+  lottie:
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

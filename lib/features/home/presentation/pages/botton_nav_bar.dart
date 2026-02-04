@@ -20,8 +20,8 @@ class _BottomNavBarState extends State<BottomNavBar> {
     MainDashboard(),
     // CreateGroupScreen(),
     GroupsPage(),
-    ActivityPage(),
-    SettingPage(),
+    ActivityScreen(),
+    SettingsScreen(),
   ];
 
   final List<BottomNavItem> _navItems = const [

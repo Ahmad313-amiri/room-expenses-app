@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:roomly/features/dashboard/presentation/pages/profile_setup_screen.dart';
 
 class PhoneOtpVerificationScreen extends StatefulWidget {
   const PhoneOtpVerificationScreen({super.key});
@@ -296,7 +297,9 @@ class _PhoneOtpVerificationScreenState
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileSetupScreen()));
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
                   const Color(0xFF1D5CFF).withOpacity(0.3),

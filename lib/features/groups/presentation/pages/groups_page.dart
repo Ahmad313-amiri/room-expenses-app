@@ -48,30 +48,33 @@ class _GroupsPageState extends State<GroupsPage> {
         ],
        backgroundColor: Colors.grey.shade200,
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SearchBar(
-              elevation: WidgetStatePropertyAll(0),
-              shape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      body: Padding(
+        padding: const EdgeInsets.only(bottom: kBottomNavigationBarHeight + 18),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SearchBar(
+                elevation: WidgetStatePropertyAll(0),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                hintText: 'Search your groups',
+                leading: const Icon(Icons.search),
+                backgroundColor: const WidgetStatePropertyAll(Colors.white),
               ),
-              hintText: 'Search your groups',
-              leading: const Icon(Icons.search),
-              backgroundColor: const WidgetStatePropertyAll(Colors.white),
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: groups.length,
-              itemBuilder: (context, index) {
-                return GroupCard(group: groups[index]);
-              },
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: groups.length,
+                itemBuilder: (context, index) {
+                  return GroupCard(group: groups[index]);
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

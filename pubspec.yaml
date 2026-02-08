@@ -52,6 +52,10 @@ dev_dependencies:
   curved_navigation_bar:
   shimmer:
   lottie:
+  firebase_core:
+  get:
+
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

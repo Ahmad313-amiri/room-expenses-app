@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:roomly/features/auth/data/repository/authentication_repository.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -149,7 +150,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  AuthenticationRepository.instance.logout();
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   elevation: 0,

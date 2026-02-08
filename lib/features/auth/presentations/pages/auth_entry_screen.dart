@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:roomly/features/dashboard/presentation/pages/phone_otp_auth_screen.dart';
+import 'package:roomly/features/auth/presentations/pages/phone_otp_auth_screen.dart';
 
 import 'emial_auth_screen.dart';
 

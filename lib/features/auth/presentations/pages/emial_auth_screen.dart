@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:roomly/features/auth/presentations/widgets/login_controller.dart';
+import 'package:roomly/features/auth/presentations/widgets/sign_up_controller.dart';
+import 'package:get/get.dart';
+
+
 
 class EmailAuthScreen extends StatefulWidget {
   const EmailAuthScreen({super.key});
@@ -13,6 +18,15 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
 
   // Controls password visibility
   bool obscurePassword = true;
+  late final SignUpController controller;
+  late final SignInController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(SignUpController());
+    _controller =Get.put(SignInController());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +78,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
             if (!isLogin) ...[
               _buildLabel('FULL NAME'),
               _buildTextField(
+                controller:isLogin ? _controller.email : controller.email,
                 hint: 'John Doe',
                 icon: Icons.person_outline,
               ),
@@ -73,6 +88,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
             // Email field
             _buildLabel('EMAIL ADDRESS'),
             _buildTextField(
+              controller: isLogin ? _controller.email : controller.email,
               hint: 'example@email.com',
               icon: Icons.email_outlined,
             ),
@@ -106,7 +122,19 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
               width: double.infinity,
               height: 58,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  if (isLogin) {
+                    _controller.loginUserController(
+                        _controller.email.text.trim(),
+                        _controller.password.text.trim()
+                    );
+                  } else {
+                    controller.registerUser(
+                      controller.email.text.trim(),
+                      controller.password.text.trim(),
+                    );
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1D5CFF),
                   shape: RoundedRectangleBorder(
@@ -157,11 +185,11 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: isLogin
                       ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
-                    )
-                  ]
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                          ),
+                        ]
                       : [],
                 ),
                 alignment: Alignment.center,
@@ -186,11 +214,11 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: !isLogin
                       ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
-                    )
-                  ]
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                          ),
+                        ]
                       : [],
                 ),
                 alignment: Alignment.center,
@@ -229,11 +257,15 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
   }
 
   // Generic text input field (used for name and email)
-  Widget _buildTextField({required String hint, required IconData icon}) {
+  Widget _buildTextField({
+    required String hint,
+    required TextEditingController controller,
+    IconData? icon,
+  }) {
     return TextField(
+      controller: controller,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.grey),
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.all(20),
@@ -243,10 +275,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFF1D5CFF),
-            width: 2,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF1D5CFF), width: 2),
         ),
       ),
     );
@@ -255,6 +284,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
   // Password field with visibility toggle
   Widget _buildPasswordField() {
     return TextField(
+      controller: isLogin ? _controller.password : controller.password,
       obscureText: obscurePassword,
       decoration: InputDecoration(
         hintText: '••••••••',
@@ -268,8 +298,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                 : Icons.visibility_off_outlined,
             color: Colors.grey,
           ),
-          onPressed: () =>
-              setState(() => obscurePassword = !obscurePassword),
+          onPressed: () => setState(() => obscurePassword = !obscurePassword),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -277,10 +306,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFF1D5CFF),
-            width: 2,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF1D5CFF), width: 2),
         ),
       ),
     );
@@ -293,11 +319,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
       child: RichText(
         textAlign: TextAlign.center,
         text: const TextSpan(
-          style: TextStyle(
-            color: Colors.grey,
-            fontSize: 13,
-            height: 1.5,
-          ),
+          style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.5),
           children: [
             TextSpan(text: 'By signing up, you agree to our\n'),
             TextSpan(

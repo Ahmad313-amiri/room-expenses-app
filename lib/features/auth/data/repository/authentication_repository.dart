@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:roomly/features/auth/presentations/widgets/signup_with_email_and_password_failure.dart';
 import 'package:roomly/features/dashboard/presentation/pages/splash_screen.dart';
 import 'package:roomly/features/home/presentation/pages/botton_nav_bar.dart';
-import 'package:roomly/features/home/presentation/pages/main_dashboard.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthenticationRepository extends GetxController {
   static AuthenticationRepository get instance => Get.find();
@@ -26,12 +26,35 @@ class AuthenticationRepository extends GetxController {
   Future<void> createUserWithEmailAndPassword(
     String email,
     String password,
+    String? name
   ) async {
     try {
-      await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      final user = credential.user;
+
+      if(user !=null){
+           await FirebaseFirestore.instance.collection('users').doc(user.uid).set(
+               {
+                 'uid':user.uid ,
+                 'email':email,
+                 'displayName': name,
+                 'phoneNumber': user.phoneNumber ?? '',
+                 'photoURL': user.photoURL ?? '',
+                 'baseCurrency': 'USD',
+                 'createdAt': FieldValue.serverTimestamp(),
+                 'updatedAt': FieldValue.serverTimestamp(),
+
+               });
+
+
+    
+
+      }
+
     } on FirebaseAuthException catch (e) {
       final ex = SignupWithEmailAndPasswordFailure.code(e.code);
       print("Firebase Auth Exception - ${ex.message}");

@@ -36,6 +36,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   intl:
   image_picker:
+  isar_flutter_libs: ^3.1.0+1
+  isar: ^3.1.0+1
+  path_provider: ^2.1.5
+  build_runner: ^2.4.13
 
 dev_dependencies:
   flutter_test:
@@ -54,6 +58,8 @@ dev_dependencies:
   lottie:
   firebase_core:
   get:
+  isar_generator: ^3.1.0+1
+  analyzer:
 
 
 # For information on the generic Dart part of this file, see the

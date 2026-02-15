@@ -1,6 +1,7 @@
 import '../../features/expenses/data/datasources/expense_local_datasource.dart';
-import '../../features/expenses/data/datasources/expense_remote_datasource.dart';
-import '../../features/expenses/domain/entities/expense.dart';
+
+import '../../features/expenses/data/datasources/remote/expense_remote_datasource.dart';
+
 
 class SyncService {
   final ExpenseLocalDataSource local;

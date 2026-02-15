@@ -15,11 +15,15 @@ class SignUpController extends GetxController{
 
 //    calling this from the ui
 
-Future<void> registerUser(String email, String password) async {
+Future<void> registerUser(String email, String password,String? name) async {
+
     try {
       await AuthenticationRepository.instance
-          .createUserWithEmailAndPassword(email, password);
-      
+          .createUserWithEmailAndPassword(
+        email.trim(),
+        password.trim(),
+        userName.text.trim(),);
+
     } on SignupWithEmailAndPasswordFailure catch (e) {
       Get.snackbar(
         'Sign Up Failed',

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:roomly/features/auth/presentations/widgets/login_controller.dart';
 import 'package:roomly/features/auth/presentations/widgets/sign_up_controller.dart';
-import 'package:get/get.dart';
-
-
 
 class EmailAuthScreen extends StatefulWidget {
   const EmailAuthScreen({super.key});
@@ -13,11 +11,9 @@ class EmailAuthScreen extends StatefulWidget {
 }
 
 class _EmailAuthScreenState extends State<EmailAuthScreen> {
-  // Tracks whether the current mode is Login or Sign Up
-  bool isLogin = false;
-
-  // Controls password visibility
+  bool isLogin = false; // Toggle login/sign up
   bool obscurePassword = true;
+
   late final SignUpController controller;
   late final SignInController _controller;
 
@@ -25,7 +21,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
   void initState() {
     super.initState();
     controller = Get.put(SignUpController());
-    _controller =Get.put(SignInController());
+    _controller = Get.put(SignInController());
   }
 
   @override
@@ -45,13 +41,8 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
         child: Column(
           children: [
             const SizedBox(height: 10),
-
-            // 1. Toggle between Login and Sign Up tabs
             _buildTabToggle(),
-
             const SizedBox(height: 48),
-
-            // 2. Dynamic title based on selected tab
             Text(
               isLogin ? 'Welcome back' : 'Create account',
               style: const TextStyle(
@@ -60,10 +51,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                 color: Color(0xFF101828),
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // Dynamic subtitle text
             Text(
               isLogin
                   ? 'Log in to manage your debts.'
@@ -71,40 +59,40 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
-
             const SizedBox(height: 48),
 
-            // 3. Full name field (shown only in Sign Up mode)
+            // Full Name (Sign Up only)
             if (!isLogin) ...[
               _buildLabel('FULL NAME'),
               _buildTextField(
-                controller:isLogin ? _controller.email : controller.email,
+                controller: controller.userName,
                 hint: 'John Doe',
                 icon: Icons.person_outline,
               ),
               const SizedBox(height: 24),
             ],
 
-            // Email field
+            // Email
             _buildLabel('EMAIL ADDRESS'),
             _buildTextField(
               controller: isLogin ? _controller.email : controller.email,
               hint: 'example@email.com',
               icon: Icons.email_outlined,
             ),
-
             const SizedBox(height: 24),
 
-            // Password field
+            // Password
             _buildLabel('PASSWORD'),
             _buildPasswordField(),
 
-            // Forgot password link (shown only in Login mode)
             if (isLogin)
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+
+
+                  },
                   child: const Text(
                     'Forgot Password?',
                     style: TextStyle(
@@ -114,10 +102,9 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   ),
                 ),
               ),
-
             const SizedBox(height: 40),
 
-            // 4. Primary action button
+            // Continue button
             SizedBox(
               width: double.infinity,
               height: 58,
@@ -126,12 +113,12 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   if (isLogin) {
                     _controller.loginUserController(
                         _controller.email.text.trim(),
-                        _controller.password.text.trim()
-                    );
+                        _controller.password.text.trim());
                   } else {
                     controller.registerUser(
                       controller.email.text.trim(),
                       controller.password.text.trim(),
+                      controller.userName.text.trim(),
                     );
                   }
                 },
@@ -153,10 +140,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 40),
-
-            // 5. Legal disclaimer text at the bottom
             _buildLegalText(),
           ],
         ),
@@ -164,7 +148,6 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
     );
   }
 
-  // Toggle widget for switching between Login and Sign Up
   Widget _buildTabToggle() {
     return Container(
       height: 56,
@@ -175,7 +158,6 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
       ),
       child: Row(
         children: [
-          // Login tab
           Expanded(
             child: GestureDetector(
               onTap: () => setState(() => isLogin = true),
@@ -184,12 +166,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   color: isLogin ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: isLogin
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                          ),
-                        ]
+                      ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
                       : [],
                 ),
                 alignment: Alignment.center,
@@ -203,8 +180,6 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
               ),
             ),
           ),
-
-          // Sign Up tab
           Expanded(
             child: GestureDetector(
               onTap: () => setState(() => isLogin = false),
@@ -213,12 +188,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   color: !isLogin ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: !isLogin
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                          ),
-                        ]
+                      ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
                       : [],
                 ),
                 alignment: Alignment.center,
@@ -237,7 +207,6 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
     );
   }
 
-  // Section label widget
   Widget _buildLabel(String text) {
     return Align(
       alignment: Alignment.centerLeft,
@@ -256,7 +225,6 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
     );
   }
 
-  // Generic text input field (used for name and email)
   Widget _buildTextField({
     required String hint,
     required TextEditingController controller,
@@ -281,7 +249,6 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
     );
   }
 
-  // Password field with visibility toggle
   Widget _buildPasswordField() {
     return TextField(
       controller: isLogin ? _controller.password : controller.password,
@@ -293,9 +260,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
         contentPadding: const EdgeInsets.all(20),
         suffixIcon: IconButton(
           icon: Icon(
-            obscurePassword
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
+            obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             color: Colors.grey,
           ),
           onPressed: () => setState(() => obscurePassword = !obscurePassword),
@@ -312,7 +277,6 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
     );
   }
 
-  // Legal text with styled links
   Widget _buildLegalText() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),

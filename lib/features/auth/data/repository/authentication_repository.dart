@@ -41,7 +41,7 @@ class AuthenticationRepository extends GetxController {
                {
                  'uid':user.uid ,
                  'email':email,
-                 'displayName': name,
+                 'displayName': name?? '',
                  'phoneNumber': user.phoneNumber ?? '',
                  'photoURL': user.photoURL ?? '',
                  'baseCurrency': 'USD',

@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import 'package:roomly/features/groups/presentation/pages/create_group.dart';
 import 'package:roomly/features/groups/presentation/pages/groups_details_page.dart';
 import '../../data/data_sources/group_local_datasource.dart';
+import '../../data/data_sources/remote/group_remote_datasource.dart';
+import '../../data/models/group_model.dart';
 import '../../data/repository/group_repository_impl.dart';
 import '../../domain/entities/group.dart';
 import '../../domain/usecases/get_groups.dart';
+import '../controller/group_controller.dart';
+import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({super.key});
@@ -14,20 +21,41 @@ class GroupsPage extends StatefulWidget {
 }
 
 class _GroupsPageState extends State<GroupsPage> {
-  late final GetGroups getGroups;
-  List<Group> groups = [];
+  late final GroupsController controller;
 
   @override
   void initState() {
     super.initState();
-    getGroups = GetGroups(GroupRepositoryImpl(GroupLocalDataSource()));
-    _loadGroups();
+
+    final repository = GroupRepositoryImpl(
+      GroupLocalDataSource(Isar.getInstance()!),
+      GroupRemoteDataSource(FirebaseFirestore.instance),
+    );
+
+    controller = GroupsController(repository);
+    controller.fetchGroups();
+    controller = Get.put(GroupsController(repository));
+
+  }
+  @override
+  void dispose() {
+    Get.delete<GroupsController>();
+    super.dispose();
   }
 
-  Future<void> _loadGroups() async {
-    final result = await getGroups();
-    setState(() => groups = result);
-  }
+  // List<Group> groups = [];
+  //
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   getGroups = GetGroups();
+  //   _loadGroups();
+  // }
+  //
+  // Future<void> _loadGroups() async {
+  //   final result = await getGroups();
+  //   setState(() => groups = result);
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -65,14 +93,17 @@ class _GroupsPageState extends State<GroupsPage> {
               ),
             ),
             Expanded(
-              child: ListView.builder(
+              child: Obx(() => ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: groups.length,
+                itemCount: controller.groups.length,
                 itemBuilder: (context, index) {
-                  return GroupCard(group: groups[index]);
+                  return GroupCard(
+                    group: controller.groups[index],
+                  );
                 },
-              ),
+              )),
             ),
+
           ],
         ),
       ),
@@ -84,7 +115,8 @@ class _GroupsPageState extends State<GroupsPage> {
 /// 🟦 GROUP CARD
 /// =======================================================
 class GroupCard extends StatelessWidget {
-  final Group group;
+  final GroupModel group;
+
 
   const GroupCard({super.key, required this.group});
 
@@ -109,6 +141,7 @@ class GroupCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+
           // ================= IMAGE =================
           Stack(
             children: [
@@ -176,12 +209,14 @@ class GroupCard extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+
                 Text(
-                  '\$${group.amount.toStringAsFixed(2)}',
+                  ' 0',
+                  // '\$${group.amount?.toStringAsFixed(2) ?? '0'}',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: group.amount > 0 ? Colors.redAccent : Colors.green,
+                    // color: group.amount > 0 ? Colors.redAccent : Colors.green,
                   ),
                 ),
                 TextButton(

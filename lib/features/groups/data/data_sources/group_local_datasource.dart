@@ -1,31 +1,32 @@
-import '../../domain/enums/groups_status.dart';
+import 'package:isar/isar.dart';
 import '../models/group_model.dart';
 
 
 class GroupLocalDataSource {
-  List<GroupModel> getGroups() {
-    return [
-      GroupModel(
-        name: 'Apt 4B Roommates',
-        description: 'Last expense: Utility Bill',
-        amount: -45,
-        status: GroupStatus.owe,
-        iconKey: 'home',
-      ),
-      GroupModel(
-        name: 'Europe Summer 24',
-        description: 'Active 2 days ago',
-        amount: 165.5,
-        status: GroupStatus.owed,
-        iconKey: 'public',
-      ),
-      GroupModel(
-        name: 'Friday Dinners',
-        description: 'All expenses settled',
-        amount: 0,
-        status: GroupStatus.settled,
-        iconKey: 'restaurant',
-      ),
-    ];
+  final Isar isar;
+
+  GroupLocalDataSource(this.isar);
+
+  Future<List<GroupModel>> getAllGroups() async {
+    return await isar.groupModels.where().findAll();
+  }
+
+  Future<GroupModel> addGroup(GroupModel group) async {
+    await isar.writeTxn(() async {
+      await isar.groupModels.put(group);
+    });
+    return group;
+  }
+
+  Future<void> updateGroup(GroupModel group) async {
+    await isar.writeTxn(() async {
+      await isar.groupModels.put(group);
+    });
+  }
+
+  Future<void> deleteGroup(int id) async {
+    await isar.writeTxn(() async {
+      await isar.groupModels.delete(id);
+    });
   }
 }

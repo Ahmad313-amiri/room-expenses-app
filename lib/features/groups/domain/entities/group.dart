@@ -1,19 +1,27 @@
+import 'group_setting.dart';
 
-
-import '../enums/groups_status.dart';
-
-class Group {
+class GroupEntity {
+  final String id;
   final String name;
   final String description;
-  final double amount;
-  final GroupStatus status;
-  final String iconKey;
+  final String coverImageUrl;
+  final String currency;
+  final String createdBy;
+  final bool isArchived;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final GroupSettings settings;
 
-  Group({
+  GroupEntity({
+    required this.id,
     required this.name,
     required this.description,
-    required this.amount,
-    required this.status,
-    required this.iconKey,
+    required this.coverImageUrl,
+    required this.currency,
+    required this.createdBy,
+    required this.isArchived,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.settings,
   });
 }

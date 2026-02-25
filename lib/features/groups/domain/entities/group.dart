@@ -10,7 +10,7 @@ class GroupEntity {
   final bool isArchived;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final GroupSettings settings;
+  final GroupSettingsEntity settings;
 
   GroupEntity({
     required this.id,

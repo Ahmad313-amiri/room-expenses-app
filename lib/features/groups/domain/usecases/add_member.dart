@@ -6,7 +6,7 @@ class AddMember {
 
   AddMember(this.repository);
 
-  Future<void> call(String groupId, GroupMemberEntity member) async {
+  Future<void> call(String groupId, MemberEntity member) async {
     return repository.addMember(groupId, member);
   }
 }

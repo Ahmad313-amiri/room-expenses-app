@@ -1,17 +1,23 @@
-class GroupMemberEntity {
+class MemberEntity {
+  final String? id; // برای Isar
+  final String firestoreId;
+  final String groupId;
   final String userId;
   final String role;
   final DateTime joinedAt;
-  final DateTime? leftAt;
   final String invitationStatus;
   final String? invitedBy;
+  final bool isSynced;
 
-  GroupMemberEntity({
+  MemberEntity({
+    this.id,
+    required this.firestoreId,
+    required this.groupId,
     required this.userId,
     required this.role,
     required this.joinedAt,
-    this.leftAt,
     required this.invitationStatus,
     this.invitedBy,
+    this.isSynced = false,
   });
 }

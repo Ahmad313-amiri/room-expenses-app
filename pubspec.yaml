@@ -41,6 +41,7 @@ dependencies:
   path_provider: ^2.1.5
   build_runner: ^2.4.13
   flutter_riverpod:
+  bugsnag_flutter: ^4.2.0
 
 dev_dependencies:
   flutter_test:

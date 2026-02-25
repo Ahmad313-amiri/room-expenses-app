@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:roomly/features/home/presentation/pages/botton_nav_bar.dart';
+import 'package:roomly/features/home/presentation/widgets/bottom_nav_bar.dart';
+import 'package:roomly/features/home/presentation/pages/home_screen.dart';
 import 'my_textfield.dart';
 
 class LoginForm extends StatefulWidget {
@@ -26,7 +27,7 @@ class _LoginFormState extends State<LoginForm> {
     if (_formKey.currentState!.validate()) {
            Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) =>  BottomNavBar()),
+        MaterialPageRoute(builder: (_) =>  HomeScreen()),
       );
 
       debugPrint('Username: ${_usernameController.text}');

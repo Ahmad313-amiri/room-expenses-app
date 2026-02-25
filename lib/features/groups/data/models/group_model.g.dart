@@ -17,44 +17,59 @@ const GroupModelSchema = CollectionSchema(
   name: r'GroupModel',
   id: 6533975783226463878,
   properties: {
-    r'createdAt': PropertySchema(
+    r'coverImageUrl': PropertySchema(
       id: 0,
+      name: r'coverImageUrl',
+      type: IsarType.string,
+    ),
+    r'createdAt': PropertySchema(
+      id: 1,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'createdBy': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'createdBy',
       type: IsarType.string,
     ),
     r'currency': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'currency',
       type: IsarType.string,
     ),
     r'description': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'description',
       type: IsarType.string,
     ),
+    r'firestoreId': PropertySchema(
+      id: 5,
+      name: r'firestoreId',
+      type: IsarType.string,
+    ),
     r'isArchived': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'isArchived',
       type: IsarType.bool,
     ),
+    r'isSynced': PropertySchema(
+      id: 7,
+      name: r'isSynced',
+      type: IsarType.bool,
+    ),
     r'name': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'name',
       type: IsarType.string,
     ),
     r'settings': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'settings',
       type: IsarType.object,
       target: r'GroupSettings',
     ),
     r'updatedAt': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -79,9 +94,16 @@ int _groupModelEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.coverImageUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.createdBy.length * 3;
   bytesCount += 3 + object.currency.length * 3;
   bytesCount += 3 + object.description.length * 3;
+  bytesCount += 3 + object.firestoreId.length * 3;
   bytesCount += 3 + object.name.length * 3;
   bytesCount += 3 +
       GroupSettingsSchema.estimateSize(
@@ -95,19 +117,22 @@ void _groupModelSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeString(offsets[1], object.createdBy);
-  writer.writeString(offsets[2], object.currency);
-  writer.writeString(offsets[3], object.description);
-  writer.writeBool(offsets[4], object.isArchived);
-  writer.writeString(offsets[5], object.name);
+  writer.writeString(offsets[0], object.coverImageUrl);
+  writer.writeDateTime(offsets[1], object.createdAt);
+  writer.writeString(offsets[2], object.createdBy);
+  writer.writeString(offsets[3], object.currency);
+  writer.writeString(offsets[4], object.description);
+  writer.writeString(offsets[5], object.firestoreId);
+  writer.writeBool(offsets[6], object.isArchived);
+  writer.writeBool(offsets[7], object.isSynced);
+  writer.writeString(offsets[8], object.name);
   writer.writeObject<GroupSettings>(
-    offsets[6],
+    offsets[9],
     allOffsets,
     GroupSettingsSchema.serialize,
     object.settings,
   );
-  writer.writeDateTime(offsets[7], object.updatedAt);
+  writer.writeDateTime(offsets[10], object.updatedAt);
 }
 
 GroupModel _groupModelDeserialize(
@@ -117,20 +142,23 @@ GroupModel _groupModelDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = GroupModel();
-  object.createdAt = reader.readDateTime(offsets[0]);
-  object.createdBy = reader.readString(offsets[1]);
-  object.currency = reader.readString(offsets[2]);
-  object.description = reader.readString(offsets[3]);
+  object.coverImageUrl = reader.readStringOrNull(offsets[0]);
+  object.createdAt = reader.readDateTime(offsets[1]);
+  object.createdBy = reader.readString(offsets[2]);
+  object.currency = reader.readString(offsets[3]);
+  object.description = reader.readString(offsets[4]);
+  object.firestoreId = reader.readString(offsets[5]);
   object.id = id;
-  object.isArchived = reader.readBool(offsets[4]);
-  object.name = reader.readString(offsets[5]);
+  object.isArchived = reader.readBool(offsets[6]);
+  object.isSynced = reader.readBool(offsets[7]);
+  object.name = reader.readString(offsets[8]);
   object.settings = reader.readObjectOrNull<GroupSettings>(
-        offsets[6],
+        offsets[9],
         GroupSettingsSchema.deserialize,
         allOffsets,
       ) ??
       GroupSettings();
-  object.updatedAt = reader.readDateTime(offsets[7]);
+  object.updatedAt = reader.readDateTime(offsets[10]);
   return object;
 }
 
@@ -142,25 +170,31 @@ P _groupModelDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
       return (reader.readString(offset)) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
+      return (reader.readBool(offset)) as P;
+    case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
       return (reader.readObjectOrNull<GroupSettings>(
             offset,
             GroupSettingsSchema.deserialize,
             allOffsets,
           ) ??
           GroupSettings()) as P;
-    case 7:
+    case 10:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -258,6 +292,160 @@ extension GroupModelQueryWhere
 
 extension GroupModelQueryFilter
     on QueryBuilder<GroupModel, GroupModel, QFilterCondition> {
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'coverImageUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'coverImageUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'coverImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'coverImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'coverImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'coverImageUrl',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'coverImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'coverImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'coverImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'coverImageUrl',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'coverImageUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      coverImageUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'coverImageUrl',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition> createdAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -716,6 +904,142 @@ extension GroupModelQueryFilter
     });
   }
 
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'firestoreId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'firestoreId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'firestoreId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition>
+      firestoreIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'firestoreId',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition> idEqualTo(
       Id value) {
     return QueryBuilder.apply(this, (query) {
@@ -774,6 +1098,16 @@ extension GroupModelQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isArchived',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterFilterCondition> isSyncedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isSynced',
         value: value,
       ));
     });
@@ -979,6 +1313,18 @@ extension GroupModelQueryLinks
 
 extension GroupModelQuerySortBy
     on QueryBuilder<GroupModel, GroupModel, QSortBy> {
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByCoverImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'coverImageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByCoverImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'coverImageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -1027,6 +1373,18 @@ extension GroupModelQuerySortBy
     });
   }
 
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByFirestoreId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByFirestoreIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.desc);
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByIsArchived() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isArchived', Sort.asc);
@@ -1036,6 +1394,18 @@ extension GroupModelQuerySortBy
   QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByIsArchivedDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isArchived', Sort.desc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByIsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> sortByIsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.desc);
     });
   }
 
@@ -1066,6 +1436,18 @@ extension GroupModelQuerySortBy
 
 extension GroupModelQuerySortThenBy
     on QueryBuilder<GroupModel, GroupModel, QSortThenBy> {
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByCoverImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'coverImageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByCoverImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'coverImageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -1114,6 +1496,18 @@ extension GroupModelQuerySortThenBy
     });
   }
 
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByFirestoreId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByFirestoreIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.desc);
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -1135,6 +1529,18 @@ extension GroupModelQuerySortThenBy
   QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByIsArchivedDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isArchived', Sort.desc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByIsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QAfterSortBy> thenByIsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.desc);
     });
   }
 
@@ -1165,6 +1571,14 @@ extension GroupModelQuerySortThenBy
 
 extension GroupModelQueryWhereDistinct
     on QueryBuilder<GroupModel, GroupModel, QDistinct> {
+  QueryBuilder<GroupModel, GroupModel, QDistinct> distinctByCoverImageUrl(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'coverImageUrl',
+          caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QDistinct> distinctByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAt');
@@ -1192,9 +1606,22 @@ extension GroupModelQueryWhereDistinct
     });
   }
 
+  QueryBuilder<GroupModel, GroupModel, QDistinct> distinctByFirestoreId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'firestoreId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<GroupModel, GroupModel, QDistinct> distinctByIsArchived() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isArchived');
+    });
+  }
+
+  QueryBuilder<GroupModel, GroupModel, QDistinct> distinctByIsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isSynced');
     });
   }
 
@@ -1217,6 +1644,12 @@ extension GroupModelQueryProperty
   QueryBuilder<GroupModel, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<GroupModel, String?, QQueryOperations> coverImageUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'coverImageUrl');
     });
   }
 
@@ -1244,9 +1677,21 @@ extension GroupModelQueryProperty
     });
   }
 
+  QueryBuilder<GroupModel, String, QQueryOperations> firestoreIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'firestoreId');
+    });
+  }
+
   QueryBuilder<GroupModel, bool, QQueryOperations> isArchivedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isArchived');
+    });
+  }
+
+  QueryBuilder<GroupModel, bool, QQueryOperations> isSyncedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isSynced');
     });
   }
 

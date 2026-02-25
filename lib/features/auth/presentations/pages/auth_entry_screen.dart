@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:roomly/features/auth/presentations/pages/phone_otp_auth_screen.dart';
 
-import 'emial_auth_screen.dart';
+import 'email_auth_screen.dart';
 
 class AuthEntryScreen extends StatelessWidget {
   const AuthEntryScreen({super.key});

@@ -1,57 +1,93 @@
+// import 'package:get/get.dart';
+// import 'package:isar/isar.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+//
+// import '../data/data_sources/group_local_datasource.dart';
+// import '../data/data_sources/group_remote_datasource.dart';
+// import '../data/repository/group_repository_impl.dart';
+// import '../domain/repositories/group_repository.dart';
+// import '../domain/usecases/add_member.dart';
+// import '../domain/usecases/archive_group.dart';
+// import '../domain/usecases/create_group.dart';
+// import '../domain/usecases/get_groups.dart';
+// import '../domain/usecases/get_members.dart';
+// import '../presentation/controller/group_controller.dart';
+//
+// class GroupBinding extends Bindings {
+//   @override
+//   void dependencies() {
+//     final isar = Get.find<Isar>();
+//     final firestore = FirebaseFirestore.instance;
+//
+//     final localDS = GroupLocalDataSource(isar);
+//     final remoteDS = GroupRemoteDataSource(firestore);
+//
+//     final GroupRepository repo =
+//     GroupRepositoryImpl(local: localDS, remote: remoteDS);
+//
+//     final getGroups = GetGroups(repo);
+//     final createGroup = CreateGroup(repo);
+//     final addMember = AddMember(repo);
+//     final archiveGroup = ArchiveGroup(repo);
+//     final getMembers = GetMembers(repo);
+//
+//     Get.lazyPut<GroupsController>(
+//           () => GroupsController(
+//         getGroupsUseCase: getGroups,
+//         createGroupUseCase: createGroup,
+//         addMemberUseCase: addMember,
+//         archiveGroupUseCase: archiveGroup,
+//         getMembersUseCase: getMembers,
+//       ),
+//       fenix: true,
+//     );
+//
+//     print("GroupBinding executed");
+//   }
+// }
+
+
+import 'package:get/get.dart';
 import 'package:isar/isar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:get/get.dart';
-
-// Import Data Sources
 import '../data/data_sources/group_local_datasource.dart';
 import '../data/data_sources/group_remote_datasource.dart';
-// Import Repository
 import '../data/repository/group_repository_impl.dart';
-import '../domain/repositories/group_repository.dart'; // اینترفیس ریپازیتوری
-// Import Use Cases
+import '../domain/repositories/group_repository.dart';
 import '../domain/usecases/add_member.dart';
 import '../domain/usecases/archive_group.dart';
 import '../domain/usecases/create_group.dart';
 import '../domain/usecases/get_groups.dart';
-import '../domain/usecases/get_members.dart'; // یوزکیس فراموش شده
-// Import Controller
+import '../domain/usecases/get_members.dart';
 import '../presentation/controller/group_controller.dart';
 
 class GroupBinding extends Bindings {
   @override
   void dependencies() {
-    // 1. External dependencies
-    // نکته: اگر Isar قبلاً در main مقداردهی شده، از getInstance استفاده کنید
-    final isar = Isar.getInstance()!;
+    final isar = Get.find<Isar>();
     final firestore = FirebaseFirestore.instance;
 
-    // 2. Data Sources
-    final localDataSource = GroupLocalDataSource(isar);
-    final remoteDataSource = GroupRemoteDataSource(firestore);
+    final localDS = GroupLocalDataSource(isar);
+    final remoteDS = GroupRemoteDataSource(firestore);
 
-    // 3. Repository
-    // بهتر است ریپازیتوری را با اینترفیس آن تزریق کنید
-    final GroupRepository repository = GroupRepositoryImpl(
-      local: localDataSource,
-      remote: remoteDataSource,
+    final GroupRepository repo = GroupRepositoryImpl(local: localDS, remote: remoteDS);
+
+    // تزریق مستقیم یوزکیس‌ها برای جلوگیری از خطای Not Found
+    Get.put(GetGroups(repo), permanent: true);
+    Get.put(CreateGroup(repo), permanent: true);
+    Get.put(AddMember(repo), permanent: true);
+    Get.put(ArchiveGroup(repo), permanent: true);
+    Get.put(GetMembers(repo), permanent: true);
+
+    Get.put<GroupsController>(
+      GroupsController(
+        getGroupsUseCase: Get.find<GetGroups>(),
+        createGroupUseCase: Get.find<CreateGroup>(),
+        addMemberUseCase: Get.find<AddMember>(),
+        archiveGroupUseCase: Get.find<ArchiveGroup>(),
+        getMembersUseCase: Get.find<GetMembers>(),
+      ),
+      permanent: true,
     );
-
-    // 4. Use Cases
-    final getGroupsUseCase = GetGroups(repository);
-    final createGroupUseCase = CreateGroup(repository);
-    final addMemberUseCase = AddMember(repository);
-    final archiveGroupUseCase = ArchiveGroup(repository);
-    final getMembersUseCase = GetMembers(repository); // اضافه شد
-
-    // 5. Controller
-    // تزریق همه وابستگی‌ها به کنترلر
-    Get.lazyPut(() => GroupsController(
-      getGroupsUseCase: getGroupsUseCase,
-      createGroupUseCase: createGroupUseCase,
-      addMemberUseCase: addMemberUseCase,
-      archiveGroupUseCase: archiveGroupUseCase,
-      getMembersUseCase: getMembersUseCase,
-    ));
   }
-
 }

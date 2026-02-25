@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-import '../widgets/acitivity_card.dart';
+import '../widgets/activity_card.dart';
 import '../widgets/owed_card.dart';
 
 class MainDashboard extends StatefulWidget {

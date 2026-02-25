@@ -2,8 +2,9 @@ import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:roomly/features/auth/presentations/widgets/signup_with_email_and_password_failure.dart';
 import 'package:roomly/features/dashboard/presentation/pages/splash_screen.dart';
-import 'package:roomly/features/home/presentation/pages/botton_nav_bar.dart';
+import 'package:roomly/features/home/presentation/widgets/bottom_nav_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:roomly/features/home/presentation/pages/home_screen.dart';
 
 class AuthenticationRepository extends GetxController {
   static AuthenticationRepository get instance => Get.find();
@@ -20,7 +21,7 @@ class AuthenticationRepository extends GetxController {
   _setInitialScreen(User? user) {
     user == null
         ? Get.offAll(() =>  SplashScreen())
-        : Get.offAll(() =>  BottomNavBar());
+        : Get.offAll(() =>  HomeScreen());
   }
 
   Future<void> createUserWithEmailAndPassword(

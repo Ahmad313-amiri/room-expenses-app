@@ -1,248 +1,347 @@
+// import 'package:flutter/material.dart';
+// import 'package:get/get.dart';
+// import 'package:roomly/features/dashboard/presentation/pages/empty_group_screen.dart';
+// import 'package:roomly/features/groups/presentation/pages/create_group.dart';
+// import 'package:roomly/features/groups/presentation/pages/groups_details_page.dart';
+// import '../controller/group_controller.dart';
+//
+// class GroupsPage extends GetView<GroupsController> {
+//   const GroupsPage({super.key});
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       backgroundColor: Colors.grey.shade200,
+//       appBar: AppBar(
+//         centerTitle: true,
+//         title: const Text(
+//           'My Groups',
+//           style: TextStyle(fontWeight: FontWeight.bold),
+//         ),
+//         actions: [
+//           IconButton(
+//             icon: const Icon(Icons.add_circle_outline, size: 28),
+//             onPressed: () => Get.toNamed('/create_group'),
+//           ),
+//           const SizedBox(width: 15),
+//         ],
+//         backgroundColor: Colors.grey.shade200,
+//         elevation: 0,
+//       ),
+//       body: Column(
+//         children: [
+//           _buildSearchBar(),
+//           Expanded(
+//             child: Obx(() {
+//               if (controller.isLoading.value) {
+//                 return const Center(child: CircularProgressIndicator());
+//               }
+//
+//               if (controller.groups.isEmpty) {
+//                 return const EmptyGroupsScreen();
+//               }
+//
+//               return RefreshIndicator(
+//                 onRefresh: () => controller.fetchGroups(),
+//                 child: ListView.builder(
+//                   padding: const EdgeInsets.symmetric(horizontal: 16),
+//                   itemCount: controller.groups.length,
+//                   itemBuilder: (context, index) {
+//                     final group = controller.groups[index];
+//                     return GroupCard(group: group);
+//                   },
+//                 ),
+//               );
+//             }),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _buildSearchBar() {
+//     return Padding(
+//       padding: const EdgeInsets.all(16.0),
+//       child: TextField(
+//         decoration: InputDecoration(
+//           hintText: 'Search your groups',
+//           prefixIcon: const Icon(Icons.search),
+//           filled: true,
+//           fillColor: Colors.white,
+//           border: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(15),
+//             borderSide: BorderSide.none,
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// class GroupCard extends StatelessWidget {
+//   final dynamic group;
+//   const GroupCard({super.key, required this.group});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       margin: const EdgeInsets.only(bottom: 16),
+//       padding: const EdgeInsets.all(16),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(20),
+//         boxShadow: [
+//           BoxShadow(
+//             color: Colors.black.withOpacity(0.05),
+//             blurRadius: 10,
+//             offset: const Offset(0, 4),
+//           ),
+//         ],
+//       ),
+//       child: Column(
+//         children: [
+//           Row(
+//             children: [
+//               CircleAvatar(
+//                 radius: 30,
+//                 backgroundColor: Colors.blue.shade100,
+//                 backgroundImage: group.imageUrl.isNotEmpty
+//                     ? NetworkImage(group.imageUrl)
+//                     : null,
+//                 child: group.imageUrl.isEmpty
+//                     ? const Icon(Icons.group, color: Colors.blue)
+//                     : null,
+//               ),
+//               const SizedBox(width: 16),
+//               Expanded(
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Text(
+//                       group.name,
+//                       style: const TextStyle(
+//                         fontSize: 18,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                     Text(
+//                       '${group.memberIds.length} members',
+//                       style: TextStyle(color: Colors.grey.shade600),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//               const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+//             ],
+//           ),
+//           const Divider(height: 32),
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               const MembersAvatars(count: 4), // به صورت موقت
+//               ElevatedButton(
+//                 onPressed: () =>
+//                     Get.to(() => GroupDetailScreen(groupId: group.id)),
+//                 style: ElevatedButton.styleFrom(
+//                   backgroundColor: Colors.blue,
+//                   foregroundColor: Colors.white,
+//                   shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(10),
+//                   ),
+//                 ),
+//                 child: const Text('View Details'),
+//               ),
+//             ],
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+//
+// class MembersAvatars extends StatelessWidget {
+//   final int count;
+//   const MembersAvatars({super.key, required this.count});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Row(
+//       children: List.generate(
+//         count > 3 ? 4 : count,
+//         (index) => Align(
+//           widthFactor: 0.6,
+//           child: CircleAvatar(
+//             radius: 14,
+//             backgroundColor: Colors.white,
+//             child: CircleAvatar(
+//               radius: 12,
+//               backgroundColor: index == 3 ? Colors.teal : Colors.grey.shade300,
+//               child: index == 3
+//                   ? const Text(
+//                       '+1',
+//                       style: TextStyle(fontSize: 10, color: Colors.white),
+//                     )
+//                   : const Icon(Icons.person, size: 12, color: Colors.white),
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+
 import 'package:flutter/material.dart';
-import 'package:isar/isar.dart';
-import 'package:roomly/features/groups/presentation/pages/create_group.dart';
-import 'package:roomly/features/groups/presentation/pages/groups_details_page.dart';
-import '../../data/data_sources/group_local_datasource.dart';
-import '../../data/data_sources/remote/group_remote_datasource.dart';
-import '../../data/models/group_model.dart';
-import '../../data/repository/group_repository_impl.dart';
-import '../../domain/entities/group.dart';
-import '../../domain/usecases/get_groups.dart';
-import '../controller/group_controller.dart';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:roomly/features/dashboard/presentation/pages/empty_group_screen.dart';
+import 'package:roomly/features/groups/presentation/pages/groups_details_page.dart';
+import '../../provider/group_binding.dart';
+import '../controller/group_controller.dart';
 
-
-class GroupsPage extends StatefulWidget {
+// تغییر از GetView به StatelessWidget برای کنترل بهتر
+class GroupsPage extends StatelessWidget {
   const GroupsPage({super.key});
 
   @override
-  State<GroupsPage> createState() => _GroupsPageState();
-}
-
-class _GroupsPageState extends State<GroupsPage> {
-  late final GroupsController controller;
-
-  @override
-  void initState() {
-    super.initState();
-
-    final repository = GroupRepositoryImpl(
-      GroupLocalDataSource(Isar.getInstance()!),
-      GroupRemoteDataSource(FirebaseFirestore.instance),
-    );
-
-    controller = GroupsController(repository);
-    controller.fetchGroups();
-    controller = Get.put(GroupsController(repository));
-
-  }
-  @override
-  void dispose() {
-    Get.delete<GroupsController>();
-    super.dispose();
-  }
-
-  // List<Group> groups = [];
-  //
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   getGroups = GetGroups();
-  //   _loadGroups();
-  // }
-  //
-  // Future<void> _loadGroups() async {
-  //   final result = await getGroups();
-  //   setState(() => groups = result);
-  // }
-
-  @override
   Widget build(BuildContext context) {
+    if (!Get.isRegistered<GroupsController>()) {
+      GroupBinding().dependencies();
+    }
+
+    final controller = Get.find<GroupsController>();
     return Scaffold(
       backgroundColor: Colors.grey.shade200,
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('My Groups'),
-        actions:  [
+        title: const Text(
+          'My Groups',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        actions: [
           IconButton(
-
-          icon:Icon(Icons.add,size: 30,),
-        onPressed: (){
-            Navigator.push(context, MaterialPageRoute(builder: (_)=>CreateGroupScreen()));
-        },
+            icon: const Icon(Icons.add_circle_outline, size: 28),
+            onPressed: () => Get.toNamed('/create_group'),
           ),
-          SizedBox(width: 20),
+          const SizedBox(width: 15),
         ],
-       backgroundColor: Colors.grey.shade200,
+        backgroundColor: Colors.grey.shade200,
+        elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.only(bottom: kBottomNavigationBarHeight + 18),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SearchBar(
-                elevation: WidgetStatePropertyAll(0),
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                hintText: 'Search your groups',
-                leading: const Icon(Icons.search),
-                backgroundColor: const WidgetStatePropertyAll(Colors.white),
-              ),
-            ),
-            Expanded(
-              child: Obx(() => ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              // بررسی خالی بودن لیست با اطمینان
+              if (controller.groups.isEmpty) {
+                return EmptyGroupsScreen();
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
                 itemCount: controller.groups.length,
                 itemBuilder: (context, index) {
-                  return GroupCard(
-                    group: controller.groups[index],
-                  );
+                  final group = controller.groups[index];
+                  return _buildGroupCard(group);
                 },
-              )),
-            ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
 
-          ],
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: 'Search groups...',
+          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
         ),
       ),
     );
   }
-}
 
-/// =======================================================
-/// 🟦 GROUP CARD
-/// =======================================================
-class GroupCard extends StatelessWidget {
-  final GroupModel group;
-
-
-  const GroupCard({super.key, required this.group});
-
-  @override
-  Widget build(BuildContext context) {
-    // Fake number of members (later from API)
-    final int membersCount = 6;
-
+  Widget _buildGroupCard(dynamic group) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          // ================= IMAGE =================
-          Stack(
+          Row(
             children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(22),
-                ),
-                child: Image.asset(
-                  'assets/pexels.jpg',
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.blue.shade100,
+                child: const Icon(Icons.group, size: 30, color: Colors.blue),
               ),
-
-              // Category on image
-              Positioned(
-                bottom: 12,
-                left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Travel',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name ?? "Unknown Group",
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${group.membersCount ?? 0} members',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-
-          // ================= AVATARS + TITLE =================
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    group.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+          const Divider(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              MembersAvatars(count: group.membersCount ?? 0),
+              ElevatedButton(
+                onPressed: () {
+                  // اطمینان از اینکه id نال نیست
+                  if (group.id != null) {
+                    Get.to(() => GroupDetailScreen(groupId: group.id!));
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                MembersAvatars(count: membersCount),
-              ],
-            ),
-          ),
-
-          // ================= AMOUNT + ACTION =================
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-
-                Text(
-                  ' 0',
-                  // '\$${group.amount?.toStringAsFixed(2) ?? '0'}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    // color: group.amount > 0 ? Colors.redAccent : Colors.green,
-                  ),
-                ),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.blue.shade300,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_)=>GroupDetailScreen()));
-                  },
-                  child: const Text(
-                    'View Details',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                child: const Text('View Details'),
+              ),
+            ],
           ),
         ],
       ),
@@ -250,49 +349,33 @@ class GroupCard extends StatelessWidget {
   }
 }
 
-/// =======================================================
-/// 👥 MEMBERS AVATARS WITH +N
-/// =======================================================
+// ویجت MembersAvatars بدون تغییر (فرض بر این است که کد قبلی شما درست است)
 class MembersAvatars extends StatelessWidget {
   final int count;
-
   const MembersAvatars({super.key, required this.count});
 
   @override
   Widget build(BuildContext context) {
-    final visibleCount = count > 3 ? 3 : count;
-
-    return SizedBox(
-      width: 24.0 * (visibleCount + 1),
-      height: 32,
-      child: Stack(
-        children: [
-          for (int i = 0; i < visibleCount; i++)
-            Positioned(
-              left: i * 20,
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.grey.shade300,
-                child: const Icon(Icons.person, size: 16, color: Colors.white),
-              ),
+    return Row(
+      children: List.generate(
+        count > 3 ? 4 : count,
+            (index) => Align(
+          widthFactor: 0.6,
+          child: CircleAvatar(
+            radius: 14,
+            backgroundColor: Colors.white,
+            child: CircleAvatar(
+              radius: 12,
+              backgroundColor: index == 3 && count > 3 ? Colors.teal : Colors.grey.shade300,
+              child: index == 3 && count > 3
+                  ? Text(
+                '+${count - 3}',
+                style: const TextStyle(fontSize: 10, color: Colors.white),
+              )
+                  : const Icon(Icons.person, size: 12, color: Colors.white),
             ),
-          if (count > 3)
-            Positioned(
-              left: visibleCount * 20,
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.teal,
-                child: Text(
-                  '+${count - 3}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-        ],
+          ),
+        ),
       ),
     );
   }

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../domain/entities/expense.dart';
-import '../../model/expense_model.dart';
+import '../../domain/entities/expense.dart';
+import '../model/expense_model.dart';
 
 class ExpenseRemoteDataSource {
   final FirebaseFirestore firestore;

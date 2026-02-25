@@ -1,5 +1,21 @@
 import 'package:flutter/material.dart';
-
+import 'package:get/get.dart';
+import 'package:isar/isar.dart';
+import '../../../auth/data/repository/authentication_repository.dart';
+import '../../data/data_sources/group_local_datasource.dart';
+import '../../data/data_sources/group_remote_datasource.dart';
+import '../../data/repository/group_repository_impl.dart';
+import '../../domain/entities/group.dart';
+import '../../domain/entities/group_setting.dart';
+import '../../domain/entities/member_entity.dart';
+import '../../domain/usecases/add_member.dart';
+import '../../domain/usecases/archive_group.dart';
+import '../../domain/usecases/create_group.dart';
+import '../../domain/usecases/get_groups.dart';
+import '../../domain/usecases/get_members.dart';
+import '../controller/group_controller.dart';
+import 'groups_details_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
 
@@ -8,17 +24,52 @@ class CreateGroupScreen extends StatefulWidget {
 }
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
+
   final TextEditingController _groupNameController = TextEditingController();
   final TextEditingController _memberController = TextEditingController();
+  GroupsController get controller => Get.find<GroupsController>();
 
-  List<Map<String, dynamic>> members = [
-    {'id': '1', 'name': 'You (Owner)', 'initials': 'ME', 'isOwner': true, 'isCurrentUser': true},
-    {'id': '2', 'name': 'John Doe', 'initials': 'JD', 'isOwner': false, 'isCurrentUser': false},
-    {'id': '3', 'name': 'Sarah Adams', 'initials': 'SA', 'isOwner': false, 'isCurrentUser': false},
-  ];
-
-  String groupImageUrl = ''; // For uploaded image
+  List<Map<String, dynamic>> members = [];
+  String groupImageUrl = '';
   bool _isCreating = false;
+
+  late final String currentUserId; // ذخیره userId واقعی
+
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //
+  //   // --- FIX: register controller if not already available ---
+  //   if (!Get.isRegistered<GroupsController>()) {
+  //     final isar = Isar.getInstance()!;
+  //     final firestore = FirebaseFirestore.instance;
+  //     final local = GroupLocalDataSource(isar);
+  //     final remote = GroupRemoteDataSource(firestore);
+  //     final repository = GroupRepositoryImpl(local: local, remote: remote);
+  //
+  //     Get.put(GroupsController(
+  //       getGroupsUseCase: GetGroups(repository),
+  //       createGroupUseCase: CreateGroup(repository),
+  //       addMemberUseCase: AddMember(repository),
+  //       archiveGroupUseCase: ArchiveGroup(repository),
+  //       getMembersUseCase: GetMembers(repository),
+  //     ));
+  //   }
+  //   final authRepo = Get.find<AuthenticationRepository>();
+  //   currentUserId = authRepo.firebaseUser.value?.uid ?? '';
+  //
+  //   // اضافه کردن خود کاربر به لیست اعضا
+  //   members.add({
+  //     'id': currentUserId,
+  //     'name': 'You (Owner)',
+  //     'initials': 'ME',
+  //     'isOwner': true,
+  //     'isCurrentUser': true,
+  //     'userId': currentUserId,
+  //   });
+  //
+  // }
 
   @override
   void dispose() {
@@ -27,66 +78,129 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade200,
-      appBar: AppBar(
+  Future<void> _createGroup() async {
+    final groupName = _groupNameController.text.trim();
+    if (groupName.isEmpty) {
+      _showSnackBar('Please enter a group name');
+      return;
+    }
+    if (members.length < 2) {
+      _showSnackBar('Add at least one more member');
+      return;
+    }
 
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+    setState(() => _isCreating = true);
+
+    try {
+      final newGroup = GroupEntity(
+        id: '',
+        name: groupName,
+        description: '',
+        coverImageUrl: groupImageUrl,
+        currency: 'USD',
+        createdBy: currentUserId, // استفاده از userId واقعی
+        isArchived: false,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        settings: GroupSettingsEntity(
+          allowInvites: true,
+          defaultSplitMethod: 'equal',
+          expenseCategories: [],
         ),
-        title: const Text(
-          'Create New Group',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-            color: Colors.black,
+      );
+
+      await controller.createNewGroup(newGroup);
+
+      final createdGroup = controller.groups.lastWhere(
+            (g) => g.name == groupName && g.createdBy == currentUserId,
+        orElse: () => controller.groups.last,
+      );
+
+      for (var member in members) {
+        if (member['isCurrentUser']) continue; // خودکار اضافه می‌شه
+
+        final memberEntity = MemberEntity(
+          firestoreId: '',
+          groupId: createdGroup.id,
+          userId: member['userId'], // این userId می‌تونه موقت باشه، بعداً باید با شناسه واقعی جایگزین بشه
+          role: 'member',
+          joinedAt: DateTime.now(),
+          invitationStatus: 'pending',
+          invitedBy: currentUserId,
+        );
+        await controller.addMemberToGroup(createdGroup.id, memberEntity);
+      }
+
+      _showSuccessDialog(groupName, createdGroup.id);
+    } catch (e) {
+      _showSnackBar('Failed to create group: $e');
+    } finally {
+      setState(() => _isCreating = false);
+    }
+  }
+
+  void _showSuccessDialog(String groupName, String groupId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 24),
+            SizedBox(width: 12),
+            Text('Success!', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text('Group "$groupName" created successfully!'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Get.off(() => GroupDetailScreen(groupId: groupId));
+            },
+            child: const Text('OK'),
           ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-
-              children: [
-                // Upload Group Photo Section
-                _buildPhotoUploadSection(),
-
-                const SizedBox(height: 32),
-
-                // Group Details Section
-                _buildGroupDetailsSection(),
-
-                const SizedBox(height: 32),
-
-                // Add Members Section
-                _buildAddMembersSection(),
-
-                const SizedBox(height: 32),
-
-                // Information Text
-                _buildInfoText(),
-
-                const SizedBox(height: 40),
-
-                // Create Group Button
-                _buildCreateButton(),
-              ],
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }
 
+  void _addMember(String nameOrEmail) {
+    if (nameOrEmail.trim().isEmpty) return;
+    if (members.any((m) => m['name'].toLowerCase() == nameOrEmail.toLowerCase())) {
+      _showSnackBar('Member already added');
+      return;
+    }
+
+    String initials = nameOrEmail
+        .split(' ')
+        .map((word) => word.isNotEmpty ? word[0].toUpperCase() : '')
+        .join('')
+        .substring(0, nameOrEmail.contains(' ') ? 2 : 1);
+
+    setState(() {
+      members.add({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'name': nameOrEmail,
+        'initials': initials,
+        'isOwner': false,
+        'isCurrentUser': false,
+        'userId': 'temp_${DateTime.now().millisecondsSinceEpoch}', // موقت
+      });
+      _memberController.clear();
+    });
+  }
+
+  void _showSnackBar(String message) {
+    Get.snackbar(
+      'Notice',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  // ========== بخش‌های UI (بدون تغییر) ==========
   Widget _buildPhotoUploadSection() {
     return Column(
       children: [
@@ -98,56 +212,27 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             decoration: BoxDecoration(
               color: Colors.grey.shade100,
               borderRadius: BorderRadius.circular(50),
-              border: Border.all(
-                color: Colors.grey.shade300,
-                width: 1.5,
-              ),
+              border: Border.all(color: Colors.grey.shade300, width: 1.5),
             ),
             child: groupImageUrl.isNotEmpty
                 ? ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                groupImageUrl,
-                fit: BoxFit.cover,
-              ),
+              child: Image.network(groupImageUrl, fit: BoxFit.cover),
             )
                 : const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.camera_alt_outlined,
-                  size: 32,
-                  color: Colors.grey,
-                ),
+                Icon(Icons.camera_alt_outlined, size: 32, color: Colors.grey),
                 SizedBox(height: 8),
-                Text(
-                  'Tap to add',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
+                Text('Tap to add', style: TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Upload Group Photo',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
-        ),
+        const Text('Upload Group Photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 4),
-        Text(
-          'Tap to change icon',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade600,
-          ),
-        ),
+        Text('Tap to change icon', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
       ],
     );
   }
@@ -156,46 +241,24 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Group Details',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+        const Text('Group Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        Text(
-          'GROUP NAME',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey.shade700,
-            letterSpacing: 0.5,
-          ),
-        ),
+        Text('GROUP NAME', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
         const SizedBox(height: 8),
         TextField(
           controller: _groupNameController,
           decoration: InputDecoration(
             hintText: 'e.g. Europe Trip, Roommates',
             hintStyle: TextStyle(color: Colors.grey.shade500),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Colors.blue, width: 1.5),
             ),
             filled: true,
             fillColor: Colors.grey.shade50,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
-          style: const TextStyle(fontSize: 16),
         ),
       ],
     );
@@ -205,17 +268,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Add Members',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+        const Text('Add Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         const SizedBox(height: 16),
-
-        // Member Input Field
         Container(
           decoration: BoxDecoration(
             color: Colors.grey.shade50,
@@ -235,59 +289,35 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    style: const TextStyle(fontSize: 16),
-                    onSubmitted: (value) {
-                      if (value.isNotEmpty) {
-                        _addMember(value);
-                      }
-                    },
+                    onSubmitted: (value) => _addMember(value),
                   ),
                 ),
                 IconButton(
-                  onPressed: () {
-                    // Navigator.push(context, MaterialPageRoute(builder: (_)=>ShowCrea))
-                    if (_memberController.text.isNotEmpty) {
-                      _addMember(_memberController.text);
-                    }
-                  },
+                  onPressed: () => _addMember(_memberController.text),
                   icon: Container(
                     decoration: BoxDecoration(
                       color: Colors.blue,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.add, color: Colors.white, size: 20),
                   ),
                 ),
               ],
             ),
           ),
         ),
-
         const SizedBox(height: 8),
-
         Text(
           'Press Enter or tap + to add member',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
-
         const SizedBox(height: 20),
-
-        // Members List
         if (members.isNotEmpty) ...[
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: members.map((member) {
-              return _buildMemberChip(member);
-            }).toList(),
+            children: members.map((member) => _buildMemberChip(member)).toList(),
           ),
           const SizedBox(height: 8),
         ],
@@ -297,14 +327,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Widget _buildMemberChip(Map<String, dynamic> member) {
     return Chip(
-      backgroundColor: member['isOwner']
-          ? Colors.blue.shade50
-          : Colors.grey.shade100,
+      backgroundColor: member['isOwner'] ? Colors.blue.shade50 : Colors.grey.shade100,
       side: BorderSide.none,
       avatar: CircleAvatar(
-        backgroundColor: member['isOwner']
-            ? Colors.blue.shade100
-            : Colors.grey.shade300,
+        backgroundColor: member['isOwner'] ? Colors.blue.shade100 : Colors.grey.shade300,
         child: Text(
           member['initials'],
           style: TextStyle(
@@ -322,55 +348,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           fontWeight: member['isOwner'] ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
-      deleteIcon: member['isCurrentUser']
-          ? null
-          : const Icon(
-        Icons.close,
-        size: 16,
-        color: Colors.grey,
-      ),
+      deleteIcon: member['isCurrentUser'] ? null : const Icon(Icons.close, size: 16, color: Colors.grey),
       onDeleted: member['isCurrentUser']
           ? null
-          : () {
-        setState(() {
-          members.removeWhere((m) => m['id'] == member['id']);
-        });
-      },
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-    );
-  }
-
-  Widget _buildInfoText() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline,
-            color: Colors.blue.shade600,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'People you add will be invited to join the group to track shared expenses.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade700,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
+          : () => setState(() => members.removeWhere((m) => m['id'] == member['id'])),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
 
@@ -383,35 +365,16 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 0,
-          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         child: _isCreating
-            ? const SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            color: Colors.white,
-            strokeWidth: 2,
-          ),
-        )
-            : const Text(
-          'Create Group',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Text('Create Group', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       ),
     );
   }
 
   void _uploadGroupPhoto() {
-    // In a real app, this would open image picker
-    // For demo, we'll simulate with a dialog
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -424,7 +387,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               title: const Text('Take Photo'),
               onTap: () {
                 Navigator.pop(context);
-                _showSnackBar('Camera opened');
+                // باز کردن دوربین
               },
             ),
             ListTile(
@@ -432,11 +395,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               title: const Text('Choose from Gallery'),
               onTap: () {
                 Navigator.pop(context);
-                // Simulate selecting an image
-                setState(() {
-                  groupImageUrl = 'https://via.placeholder.com/150';
-                });
-                _showSnackBar('Photo selected');
+                setState(() => groupImageUrl = 'https://via.placeholder.com/150');
               },
             ),
             ListTile(
@@ -444,121 +403,73 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               title: const Text('Remove Photo'),
               onTap: () {
                 Navigator.pop(context);
-                setState(() {
-                  groupImageUrl = '';
-                });
-                _showSnackBar('Photo removed');
+                setState(() => groupImageUrl = '');
               },
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         ],
       ),
     );
   }
 
-  void _addMember(String nameOrEmail) {
-    if (nameOrEmail.trim().isEmpty) return;
-
-    // Check if member already exists
-    if (members.any((member) =>
-    member['name'].toLowerCase() == nameOrEmail.toLowerCase())) {
-      _showSnackBar('Member already added');
-      return;
-    }
-
-    // Generate initials
-    String initials = nameOrEmail
-        .split(' ')
-        .map((word) => word.isNotEmpty ? word[0].toUpperCase() : '')
-        .join('')
-        .substring(0, 2);
-
-    setState(() {
-      members.add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'name': nameOrEmail,
-        'initials': initials,
-        'isOwner': false,
-        'isCurrentUser': false,
-      });
-      _memberController.clear();
-    });
-  }
-
-  void _createGroup() async {
-    final groupName = _groupNameController.text.trim();
-
-    if (groupName.isEmpty) {
-      _showSnackBar('Please enter a group name');
-      return;
-    }
-
-    if (members.length < 2) {
-      _showSnackBar('Add at least one more member');
-      return;
-    }
-
-    setState(() {
-      _isCreating = true;
-    });
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _isCreating = false;
-    });
-
-    // Show success dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(
-              Icons.check_circle,
-              color: Colors.green,
-              size: 24,
-            ),
-            SizedBox(width: 12),
-            Text(
-              'Success!',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade200,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.black),
+          onPressed: () => Get.back(),
         ),
-        content: Text('Group "$groupName" created successfully!'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context, {'success': true, 'groupName': groupName});
-            },
-            child: const Text('OK'),
-          ),
-        ],
+        title: const Text('Create New Group', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0.5,
       ),
-    );
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+      body: SafeArea(
+        child: Obx(() {
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _buildPhotoUploadSection(),
+                const SizedBox(height: 32),
+                _buildGroupDetailsSection(),
+                const SizedBox(height: 32),
+                _buildAddMembersSection(),
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'People you add will be invited to join the group to track shared expenses.',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+                _buildCreateButton(),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }

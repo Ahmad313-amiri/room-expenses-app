@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../../groups/presentation/pages/settlement_verification_screen.dart';
 
 class ActivityScreen extends StatefulWidget {
@@ -11,25 +10,45 @@ class ActivityScreen extends StatefulWidget {
 
 class _ActivityScreenState extends State<ActivityScreen> {
   bool isLoading = true;
+
   @override
   void initState() {
     super.initState();
     _loadData();
   }
 
+  // اصلاح شده: استفاده از یک متد واحد و چک کردن mounted
   Future<void> _loadData() async {
+    // شبیه‌سازی لودینگ داده‌ها
     await Future.delayed(const Duration(seconds: 2));
-    setState(() => isLoading = false);
+
+    // چک کردن اینکه آیا ویجت هنوز در صفحه حضور دارد یا خیر
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   Future<void> _onRefresh() async {
+    if (!mounted) return;
     setState(() => isLoading = true);
+
     await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
     setState(() => isLoading = false);
   }
 
   // All activities tab content
   Widget _buildAllActivityList() {
+    // نمایش لودینگ در صورتی که isLoading true باشد
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2ECC71)),
+      );
+    }
+
     return RefreshIndicator(
       color: const Color(0xFF2ECC71),
       onRefresh: _onRefresh,
@@ -48,7 +67,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             title: 'Settlement Request: \$45.00',
             subtitle: 'James wants to settle for \'Beach Trip\'',
             image:
-                'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400',
+            'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400',
             isActive: true,
           ),
 
@@ -90,11 +109,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
-
       child: Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
-
-        // Top AppBar with TabBar
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -118,8 +134,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
               onPressed: () {},
             ),
           ],
-
-          // Activity filter tabs
           bottom: const TabBar(
             labelColor: Color(0xFF2ECC71),
             unselectedLabelColor: Colors.grey,
@@ -133,8 +147,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ],
           ),
         ),
-
-        // Tab content
         body: TabBarView(
           children: [
             _buildAllActivityList(),
@@ -147,7 +159,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 }
 
-// Settlement request card widget
+// همان متدهای کمکی UI شما بدون تغییر
 Widget _buildSettlementRequestCard({
   required BuildContext context,
   required String title,
@@ -168,7 +180,6 @@ Widget _buildSettlementRequestCard({
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Active indicator bar
         if (isActive)
           Container(
             width: 4,
@@ -179,8 +190,6 @@ Widget _buildSettlementRequestCard({
             ),
           ),
         const SizedBox(width: 8),
-
-        // Card content
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,57 +221,53 @@ Widget _buildSettlementRequestCard({
                 style: const TextStyle(color: Colors.grey, fontSize: 13),
               ),
               const SizedBox(height: 16),
-
-              // Active vs verified state
               isActive
                   ? ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_)=>SettlementVerificationScreen()));
-                      },
-                      icon: const Icon(Icons.check_circle, size: 18),
-                      label: const Text('Verify Now'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2ECC71),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                    )
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_)=>SettlementVerificationScreen()));
+                },
+                icon: const Icon(Icons.check_circle, size: 18),
+                label: const Text('Verify Now'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2ECC71),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+              )
                   : Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Verified',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            Icons.check_circle,
-                            size: 14,
-                            color: Colors.grey,
-                          ),
-                        ],
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Verified',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    SizedBox(width: 4),
+                    Icon(
+                      Icons.check_circle,
+                      size: 14,
+                      color: Colors.grey,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-
-        // Receipt image
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.network(image, width: 80, height: 80, fit: BoxFit.cover),
@@ -272,7 +277,6 @@ Widget _buildSettlementRequestCard({
   );
 }
 
-// Standard activity list item
 Widget _buildActivityTile({
   required String name,
   required String action,
@@ -287,8 +291,6 @@ Widget _buildActivityTile({
       children: [
         CircleAvatar(backgroundImage: NetworkImage(avatar), radius: 24),
         const SizedBox(width: 12),
-
-        // Activity text
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,8 +319,6 @@ Widget _buildActivityTile({
             ],
           ),
         ),
-
-        // Time and unread indicator
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -341,7 +341,6 @@ Widget _buildActivityTile({
   );
 }
 
-// Verified settlement info row
 Widget _buildVerifiedTile({required String title, required String desc}) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 12),

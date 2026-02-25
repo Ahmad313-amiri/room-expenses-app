@@ -1,7 +1,7 @@
 import '../../domain/entities/expense.dart';
 
 import '../datasources/expense_local_datasource.dart';
-import '../datasources/remote/expense_remote_datasource.dart';
+import '../datasources/expense_remote_datasource.dart';
 import '../model/isar/expense_isar.dart';
 
 

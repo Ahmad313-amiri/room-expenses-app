@@ -293,7 +293,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => _addMember(_memberController.text),
+                   onPressed: () => _addMember(_memberController.text),
                   icon: Container(
                     decoration: BoxDecoration(
                       color: Colors.blue,

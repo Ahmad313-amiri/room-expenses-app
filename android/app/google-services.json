@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "991750073976",
+    "project_id": "roomly-split-expense",
+    "storage_bucket": "roomly-split-expense.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:991750073976:android:0f6325a8c48dfcc32b878d",
+        "android_client_info": {
+          "package_name": "com.example.roomly"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "991750073976-eupoghin5qf7fnqc9uqit1atp3j1thgq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.roomly",
+            "certificate_hash": "0cc28289445bf0c958d434a3bf5f6ed5ef5f1f1f"
+          }
+        },
+        {
+          "client_id": "991750073976-45i8ukqou7nt24v1i25gtqtjgkft4k3q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYRxLLdc6Mp44698iYmJ-RWRxb7jGQUmc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "991750073976-45i8ukqou7nt24v1i25gtqtjgkft4k3q.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "991750073976-809atoduldvofsc5l9kiba5g1r84q0ut.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.roomly"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,57 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../controller/group_controller.dart';
+import '../pages/advance_settle_screen.dart';
+import '../pages/split_method.dart';
+
+class GroupActionsWidget extends StatelessWidget {
+  final GroupsController controller;
+  const GroupActionsWidget({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Get.to(() => const AdvancedSettleUpScreen());
+              },
+              icon: const Icon(Icons.handshake_outlined, size: 18),
+              label: const Text('Settle Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                 Get.to(() => GroupExpenseSplitScreen(
+                  groupId: controller.groupId.value,
+                  members: controller.members,
+                ));
+              },
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text('Add Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

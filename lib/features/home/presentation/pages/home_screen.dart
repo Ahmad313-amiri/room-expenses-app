@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:roomly/features/groups/presentation/pages/groups_page.dart';
+import 'package:roomly/features/home/presentation/pages/activity_page.dart';
 import 'package:roomly/features/home/presentation/pages/main_dashboard.dart';
-import 'botton_nav_bar.dart'; // نسخه یکتای نوار پایین
+import 'package:roomly/features/home/presentation/pages/setting_page.dart';
+import 'botton_nav_bar.dart';
+import 'controller/home_page_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,34 +15,29 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
+  final HomeController controller = Get.put(HomeController());
 
-  // صفحات را اینجا تعریف می‌کنیم تا هوم‌سکرین بر آن‌ها مدیریت داشته باشد
-  final List<Widget> _pages = [
-    const MainDashboard(),
-    const GroupsPage(),
-    const Center(child: Text('Activity')),
-    const Center(child: Text('Settings')),
+  final List<Widget> _pages = const [
+    MainDashboard(),
+    GroupsPage(),
+    ActivityScreen(),
+    SettingsScreen(),
   ];
-  @override
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true, // برای نمایش بهتر نوار نویگیشن شیشه‌ای
-      body: IndexedStack(
-        index: _selectedIndex,
+      extendBody: true,
+      body: Obx(() => IndexedStack(
+        index: controller.selectedIndex.value,
         children: _pages,
-      ),
-      // استفاده از نوار نویگیشن به عنوان یک ویجت بیرونی
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _selectedIndex,
+      )),
+      bottomNavigationBar: Obx(() => CustomBottomNavBar(
+        currentIndex: controller.selectedIndex.value,
         onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+          controller.changeTab(index);
         },
-      ),
+      )),
     );
   }
 }

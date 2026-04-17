@@ -6,7 +6,7 @@ class GetGroups {
 
   GetGroups(this.repository);
 
-  Future<List<GroupEntity>> call() async {
-    return repository.getGroups();
+  Future<List<GroupEntity>> call(String userId) async {
+    return repository.getGroups(userId: userId);
   }
 }

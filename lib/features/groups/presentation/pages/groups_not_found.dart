@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:roomly/features/groups/presentation/pages/create_group.dart';
 
-import 'groups_page.dart';
+import 'create_group.dart';
 
 
 class GroupsNotFound extends StatelessWidget {
@@ -11,14 +10,6 @@ class GroupsNotFound extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade200,
-      appBar: AppBar(
-        backgroundColor: Colors.grey.shade200,
-        actionsPadding: EdgeInsets.only(right: 20),
-        centerTitle: true,
-        title: Text('Groups'),
-        actions: [Icon(Icons.add)],
-        leading: Icon(Icons.settings),
-      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -69,7 +60,7 @@ class GroupsNotFound extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    Navigator.push(context,MaterialPageRoute(builder: (_)=>CreateGroupScreen()));
+                    Navigator.push(context,MaterialPageRoute(builder: (_)=>CreateNewGroupScreen()));
                   },
                   child: Row(
                     // crossAxisAlignment: CrossAxisAlignment.center,

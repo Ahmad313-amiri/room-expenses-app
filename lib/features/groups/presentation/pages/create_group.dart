@@ -1,476 +1,557 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:isar/isar.dart';
-import '../../../auth/data/repository/authentication_repository.dart';
-import '../../data/data_sources/group_local_datasource.dart';
-import '../../data/data_sources/group_remote_datasource.dart';
-import '../../data/repository/group_repository_impl.dart';
-import '../../domain/entities/group.dart';
-import '../../domain/entities/group_setting.dart';
-import '../../domain/entities/member_entity.dart';
-import '../../domain/usecases/add_member.dart';
-import '../../domain/usecases/archive_group.dart';
-import '../../domain/usecases/create_group.dart';
-import '../../domain/usecases/get_groups.dart';
-import '../../domain/usecases/get_members.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:roomly/features/auth/data/repository/authentication_repository.dart';
+import 'package:roomly/features/groups/domain/entities/group.dart';
+import 'package:roomly/features/groups/domain/entities/group_setting.dart';
+import 'package:roomly/features/groups/presentation/pages/select_member_screen.dart';
+import '../../data/models/member_model.dart';
 import '../controller/group_controller.dart';
 import 'groups_details_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-class CreateGroupScreen extends StatefulWidget {
-  const CreateGroupScreen({super.key});
+
+class CreateNewGroupScreen extends StatefulWidget {
+  const CreateNewGroupScreen({super.key});
 
   @override
-  State<CreateGroupScreen> createState() => _CreateGroupScreenState();
+  State<CreateNewGroupScreen> createState() => _CreateNewGroupScreenState();
 }
 
-class _CreateGroupScreenState extends State<CreateGroupScreen> {
+class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
+  final _nameController = TextEditingController();
+  final _memberController = TextEditingController();
 
-  final TextEditingController _groupNameController = TextEditingController();
-  final TextEditingController _memberController = TextEditingController();
-  GroupsController get controller => Get.find<GroupsController>();
+  late GroupsController controller;
 
-  List<Map<String, dynamic>> members = [];
-  String groupImageUrl = '';
+  final List<Map<String, String>> _categories = [
+    {'name': 'Home', 'icon': 'home'},
+    {'name': 'Travel', 'icon': 'flight'},
+    {'name': 'Dining', 'icon': 'restaurant'},
+    {'name': 'Other', 'icon': 'more_horiz'},
+  ];
+
+  final List<String> _currencyOptions = [
+    'USD - Dollar',
+    'EUR - Euro',
+    'AFN - Afghani',
+    'IRR - Rial'
+  ];
+
+  late String _selectedCategory;
+  late String _selectedCurrency;
+
+  File? _selectedImage;
   bool _isCreating = false;
 
-  late final String currentUserId; // ذخیره userId واقعی
+  List<MemberModel> members = [];
 
-
-  // @override
-  // void initState() {
-  //   super.initState();
-  //
-  //   // --- FIX: register controller if not already available ---
-  //   if (!Get.isRegistered<GroupsController>()) {
-  //     final isar = Isar.getInstance()!;
-  //     final firestore = FirebaseFirestore.instance;
-  //     final local = GroupLocalDataSource(isar);
-  //     final remote = GroupRemoteDataSource(firestore);
-  //     final repository = GroupRepositoryImpl(local: local, remote: remote);
-  //
-  //     Get.put(GroupsController(
-  //       getGroupsUseCase: GetGroups(repository),
-  //       createGroupUseCase: CreateGroup(repository),
-  //       addMemberUseCase: AddMember(repository),
-  //       archiveGroupUseCase: ArchiveGroup(repository),
-  //       getMembersUseCase: GetMembers(repository),
-  //     ));
-  //   }
-  //   final authRepo = Get.find<AuthenticationRepository>();
-  //   currentUserId = authRepo.firebaseUser.value?.uid ?? '';
-  //
-  //   // اضافه کردن خود کاربر به لیست اعضا
-  //   members.add({
-  //     'id': currentUserId,
-  //     'name': 'You (Owner)',
-  //     'initials': 'ME',
-  //     'isOwner': true,
-  //     'isCurrentUser': true,
-  //     'userId': currentUserId,
-  //   });
-  //
-  // }
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<GroupsController>();
+    _selectedCategory = _categories[0]['name']!;
+    _selectedCurrency = _currencyOptions[0];
+  }
 
   @override
   void dispose() {
-    _groupNameController.dispose();
+    _nameController.dispose();
     _memberController.dispose();
     super.dispose();
   }
 
+  Future<void> _pickImage({required ImageSource source}) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 85);
+
+    if (picked != null) {
+      setState(() {
+        _selectedImage = File(picked.path);
+      });
+    }
+  }
+
+  void _showImageSourceActionSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text("Take Photo"),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickImage(source: ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text("Choose from Gallery"),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickImage(source: ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addMemberManual() {
+    final name = _memberController.text.trim();
+    if (name.isEmpty) return;
+
+    final exists = members.any((m) => m.name == name);
+    if (exists) {
+      Get.snackbar("Warning", "Member already added");
+      return;
+    }
+
+    setState(() {
+      members.add(MemberModel(
+        name: name,
+        userId:DateTime.now().toString(),
+        firestoreId: '',
+        groupId: '',
+        role: '',
+        joinedAt:DateTime.now(),
+        invitationStatus: '',
+      ));
+    });
+
+    _memberController.clear();
+  }
+
+  void _openContactsPicker() async {
+    final result = await Get.to(() => const SelectMembersScreen());
+
+    if (result != null && result is List) {
+      setState(() {
+        for (var m in result) {
+          if (!members.any((old) => old.userId == m['uid'])) {
+            members.add(
+              MemberModel(
+                firestoreId: '',
+                groupId: '',
+                userId: m['uid'],
+                name: m['name'] ?? '',
+                role: 'member',
+                joinedAt: DateTime.now(),
+                invitationStatus: 'pending',
+                isAppUser: true,
+              ),
+            );
+          }
+        }
+      });
+    }
+  }
+
   Future<void> _createGroup() async {
-    final groupName = _groupNameController.text.trim();
+    final groupName = _nameController.text.trim();
     if (groupName.isEmpty) {
-      _showSnackBar('Please enter a group name');
+      Get.snackbar("Error", "Please enter a group name",
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    if (members.length < 2) {
-      _showSnackBar('Add at least one more member');
+
+    final authRepo = Get.find<AuthenticationRepository>();
+    final firebaseUser = authRepo.firebaseUser.value;
+    if (firebaseUser == null) {
+      Get.snackbar("Error", "User not authenticated");
       return;
     }
+
+    final uid = firebaseUser.uid ;
+    final userName = firebaseUser.displayName ?? "You";
 
     setState(() => _isCreating = true);
 
     try {
+      // When creating a new group, always add the creator as 'admin' if not present.
+      if (!members.any((m) => m.userId == uid)) {
+        members.insert(0, MemberModel(
+          name: userName,
+          userId: uid,
+          firestoreId: '',
+          groupId: '',
+          role: 'admin',
+          joinedAt: DateTime.now(),
+          invitationStatus: 'accepted',
+          isAppUser: true,
+        ));
+      }
+
       final newGroup = GroupEntity(
         id: '',
         name: groupName,
-        description: '',
-        coverImageUrl: groupImageUrl,
-        currency: 'USD',
-        createdBy: currentUserId, // استفاده از userId واقعی
+        membersCount: members.length,
+        description: _selectedCategory,
+        coverImageUrl: '',
+        currency: _selectedCurrency.split(' ')[0],
+        createdBy: uid,
         isArchived: false,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         settings: GroupSettingsEntity(
           allowInvites: true,
           defaultSplitMethod: 'equal',
-          expenseCategories: [],
+          expenseCategories: ['General', 'Food', 'Transport'],
         ),
       );
 
-      await controller.createNewGroup(newGroup);
-
-      final createdGroup = controller.groups.lastWhere(
-            (g) => g.name == groupName && g.createdBy == currentUserId,
-        orElse: () => controller.groups.last,
-      );
+      final groupId = await controller.createNewGroup(newGroup /*, imageFile: _selectedImage*/);
+      if (groupId == null) throw Exception("Group creation failed");
 
       for (var member in members) {
-        if (member['isCurrentUser']) continue; // خودکار اضافه می‌شه
-
-        final memberEntity = MemberEntity(
-          firestoreId: '',
-          groupId: createdGroup.id,
-          userId: member['userId'], // این userId می‌تونه موقت باشه، بعداً باید با شناسه واقعی جایگزین بشه
-          role: 'member',
-          joinedAt: DateTime.now(),
-          invitationStatus: 'pending',
-          invitedBy: currentUserId,
-        );
-        await controller.addMemberToGroup(createdGroup.id, memberEntity);
+        final identifier = member.userId.isNotEmpty ? member.userId : member.userId;
+        final name = member.name;
+        if (identifier.isNotEmpty && name.isNotEmpty) {
+          await controller.addMemberToGroup(groupId, identifier, name);
+        }
       }
 
-      _showSuccessDialog(groupName, createdGroup.id);
+      if (!mounted) return;
+      Get.off(() => GroupDetailScreen(groupId: groupId));
     } catch (e) {
-      _showSnackBar('Failed to create group: $e');
+      Get.snackbar("Error", e.toString());
     } finally {
-      setState(() => _isCreating = false);
+      if (mounted) setState(() => _isCreating = false);
     }
   }
 
-  void _showSuccessDialog(String groupName, String groupId) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          onPressed: () => Get.back(),
+        ),
+        title: const Text(
+          'Create New Group',
+          style: TextStyle(
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 24),
-            SizedBox(width: 12),
-            Text('Success!', style: TextStyle(fontWeight: FontWeight.bold)),
+            _buildImagePicker(),
+            const SizedBox(height: 32),
+            _buildTextField(
+              "Group Name",
+              _nameController,
+              "Example: Friends Trip",
+            ),
+            const SizedBox(height: 32),
+            _buildCategorySelector(),
+            const SizedBox(height: 32),
+            _buildCurrencySelector(),
+            const SizedBox(height: 32),
+            _buildMemberSection(),
+            const SizedBox(height: 40),
+            _buildSubmitButton(),
           ],
         ),
-        content: Text('Group "$groupName" created successfully!'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Get.off(() => GroupDetailScreen(groupId: groupId));
-            },
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
   }
 
-  void _addMember(String nameOrEmail) {
-    if (nameOrEmail.trim().isEmpty) return;
-    if (members.any((m) => m['name'].toLowerCase() == nameOrEmail.toLowerCase())) {
-      _showSnackBar('Member already added');
-      return;
-    }
-
-    String initials = nameOrEmail
-        .split(' ')
-        .map((word) => word.isNotEmpty ? word[0].toUpperCase() : '')
-        .join('')
-        .substring(0, nameOrEmail.contains(' ') ? 2 : 1);
-
-    setState(() {
-      members.add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'name': nameOrEmail,
-        'initials': initials,
-        'isOwner': false,
-        'isCurrentUser': false,
-        'userId': 'temp_${DateTime.now().millisecondsSinceEpoch}', // موقت
-      });
-      _memberController.clear();
-    });
-  }
-
-  void _showSnackBar(String message) {
-    Get.snackbar(
-      'Notice',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      duration: const Duration(seconds: 2),
+  Widget _buildImagePicker() {
+    return Center(
+      child: GestureDetector(
+        onTap: _showImageSourceActionSheet,
+        child: Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: ClipOval(
+                child: _selectedImage != null
+                    ? Image.file(_selectedImage!, fit: BoxFit.cover)
+                    : Icon(
+                  Icons.groups_outlined,
+                  size: 48,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1D5CFF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  // ========== بخش‌های UI (بدون تغییر) ==========
-  Widget _buildPhotoUploadSection() {
+  Widget _buildTextField(
+      String label,
+      TextEditingController controller,
+      String hint,
+      ) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onTap: _uploadGroupPhoto,
-          child: Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(50),
-              border: Border.all(color: Colors.grey.shade300, width: 1.5),
-            ),
-            child: groupImageUrl.isNotEmpty
-                ? ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.network(groupImageUrl, fit: BoxFit.cover),
-            )
-                : const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.camera_alt_outlined, size: 32, color: Colors.grey),
-                SizedBox(height: 8),
-                Text('Tap to add', style: TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
           ),
         ),
         const SizedBox(height: 12),
-        const Text('Upload Group Photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 4),
-        Text('Tap to change icon', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+        TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 18,
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildGroupDetailsSection() {
+  Widget _buildCategorySelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Group Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text('GROUP NAME', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
-        const SizedBox(height: 8),
+        const Text('Category', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: _categories.map((cat) {
+            bool isSelected = _selectedCategory == cat['name'];
+            return GestureDetector(
+              onTap: () => setState(() => _selectedCategory = cat['name']!),
+              child: Container(
+                width: 75,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha:  0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF1D5CFF)
+                        : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      _getIconData(cat['icon']!),
+                      color: isSelected ? const Color(0xFF1D5CFF) : Colors.grey,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      cat['name']!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected
+                            ? const Color(0xFF1D5CFF)
+                            : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCurrencySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Group Currency',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedCurrency,
+              isExpanded: true,
+              items: _currencyOptions
+                  .map((val) => DropdownMenuItem(value: val, child: Text(val)))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedCurrency = val);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMemberSection() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Group Members',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            TextButton.icon(
+              onPressed: _openContactsPicker,
+              icon: const Icon(Icons.contacts, size: 18),
+              label: const Text("Select Contact"),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         TextField(
-          controller: _groupNameController,
+          controller: _memberController,
           decoration: InputDecoration(
-            hintText: 'e.g. Europe Trip, Roommates',
-            hintStyle: TextStyle(color: Colors.grey.shade500),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.blue, width: 1.5),
+            hintText: "Enter person's name...",
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.add_circle, color: Color(0xFF1D5CFF)),
+              onPressed: _addMemberManual,
             ),
             filled: true,
-            fillColor: Colors.grey.shade50,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAddMembersSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Add Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _memberController,
-                    decoration: InputDecoration(
-                      hintText: '+ Name or email address',
-                      hintStyle: TextStyle(color: Colors.grey.shade500),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onSubmitted: (value) => _addMember(value),
-                  ),
-                ),
-                IconButton(
-                   onPressed: () => _addMember(_memberController.text),
-                  icon: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(Icons.add, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
             ),
           ),
+          onSubmitted: (_) => _addMemberManual(),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Press Enter or tap + to add member',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 20),
-        if (members.isNotEmpty) ...[
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: members.map((member) => _buildMemberChip(member)).toList(),
+        const SizedBox(height: 16),
+        if (members.isNotEmpty)
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: members.length,
+              itemBuilder: (context, index) {
+                final m = members[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 15),
+                  child: Column(
+                    children: [
+                      Stack(
+                        alignment: Alignment.topRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            // backgroundImage: NetworkImage(),
+                          ),
+                          GestureDetector(
+                            onTap: () =>
+                                setState(() => members.removeAt(index)),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(m.name, style: const TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-          const SizedBox(height: 8),
-        ],
       ],
     );
   }
 
-  Widget _buildMemberChip(Map<String, dynamic> member) {
-    return Chip(
-      backgroundColor: member['isOwner'] ? Colors.blue.shade50 : Colors.grey.shade100,
-      side: BorderSide.none,
-      avatar: CircleAvatar(
-        backgroundColor: member['isOwner'] ? Colors.blue.shade100 : Colors.grey.shade300,
-        child: Text(
-          member['initials'],
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: member['isOwner'] ? Colors.blue : Colors.grey.shade700,
-          ),
-        ),
-      ),
-      label: Text(
-        member['name'],
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.black87,
-          fontWeight: member['isOwner'] ? FontWeight.w600 : FontWeight.normal,
-        ),
-      ),
-      deleteIcon: member['isCurrentUser'] ? null : const Icon(Icons.close, size: 16, color: Colors.grey),
-      onDeleted: member['isCurrentUser']
-          ? null
-          : () => setState(() => members.removeWhere((m) => m['id'] == member['id'])),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    );
-  }
-
-  Widget _buildCreateButton() {
+  Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
         onPressed: _isCreating ? null : _createGroup,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          backgroundColor: const Color(0xFF1D5CFF),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
         child: _isCreating
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : const Text('Create Group', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text(
+          'Create Group',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
 
-  void _uploadGroupPhoto() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Upload Photo'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                // باز کردن دوربین
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => groupImageUrl = 'https://via.placeholder.com/150');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.remove_circle_outline),
-              title: const Text('Remove Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => groupImageUrl = '');
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade200,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
-          onPressed: () => Get.back(),
-        ),
-        title: const Text('Create New Group', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-      ),
-      body: SafeArea(
-        child: Obx(() {
-          if (controller.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                _buildPhotoUploadSection(),
-                const SizedBox(height: 32),
-                _buildGroupDetailsSection(),
-                const SizedBox(height: 32),
-                _buildAddMembersSection(),
-                const SizedBox(height: 32),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'People you add will be invited to join the group to track shared expenses.',
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                _buildCreateButton(),
-              ],
-            ),
-          );
-        }),
-      ),
-    );
+  IconData _getIconData(String name) {
+    switch (name) {
+      case 'home':
+        return Icons.home_rounded;
+      case 'flight':
+        return Icons.flight_rounded;
+      case 'restaurant':
+        return Icons.restaurant_rounded;
+      default:
+        return Icons.more_horiz_rounded;
+    }
   }
 }

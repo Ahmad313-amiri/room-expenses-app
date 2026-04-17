@@ -17,12 +17,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
     _loadData();
   }
 
-  // اصلاح شده: استفاده از یک متد واحد و چک کردن mounted
   Future<void> _loadData() async {
-    // شبیه‌سازی لودینگ داده‌ها
+
     await Future.delayed(const Duration(seconds: 2));
 
-    // چک کردن اینکه آیا ویجت هنوز در صفحه حضور دارد یا خیر
     if (!mounted) return;
 
     setState(() {

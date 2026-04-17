@@ -14,7 +14,7 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
   DateTime _selectedDate = DateTime.now();
   String _paymentMethod = 'Bank Transfer';
   bool _isConfirmed = false;
-  bool _hasImage = true; // Simulating a selected receipt for the thumbnail
+  bool _hasImage = true;
   final List<String> _methods = ['Bank Transfer', 'Cash', 'Digital Wallet', 'Other'];
 
   // Function to select a date using the system date picker

@@ -1,15 +1,4 @@
-// lib/features/expenses/domain/entities/expense.dart
-
-enum ExpenseScope {
-  personal,
-  group,
-}
-
-enum SyncStatus {
-  pending,
-  synced,
-  failed,
-}
+enum ExpenseScope { personal, group }
 
 class Expense {
   final String id;
@@ -17,10 +6,13 @@ class Expense {
   final String description;
   final DateTime date;
   final String createdBy;
-  final String? groupId;
+  final String groupId;
   final ExpenseScope scope;
-  final SyncStatus syncStatus;
   final bool isDeleted;
+
+  //   // userId -> amount paid   // userId -> amount should pay
+  final Map<String, double> paidBy;
+  final Map<String, double> split;
 
   const Expense({
     required this.id,
@@ -29,9 +21,10 @@ class Expense {
     required this.date,
     required this.createdBy,
     required this.scope,
-    this.groupId,
-    this.syncStatus = SyncStatus.pending,
+    required this.groupId,
     this.isDeleted = false,
+    required this.paidBy,
+    required this.split,
   });
 
   Expense copyWith({
@@ -42,8 +35,9 @@ class Expense {
     String? createdBy,
     String? groupId,
     ExpenseScope? scope,
-    SyncStatus? syncStatus,
     bool? isDeleted,
+    Map<String, double>? paidBy,
+    Map<String, double>? split,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -53,8 +47,9 @@ class Expense {
       createdBy: createdBy ?? this.createdBy,
       groupId: groupId ?? this.groupId,
       scope: scope ?? this.scope,
-      syncStatus: syncStatus ?? this.syncStatus,
       isDeleted: isDeleted ?? this.isDeleted,
+      paidBy: paidBy ?? this.paidBy,
+      split: split ?? this.split,
     );
   }
 }

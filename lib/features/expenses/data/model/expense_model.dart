@@ -1,34 +1,35 @@
-// lib/features/expenses/data/models/expense_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/expense.dart';
 
-class ExpenseModel extends Expense {
-  const ExpenseModel({
-    required String id,
-    required double amount,
-    required String description,
-    required DateTime date,
-    required String createdBy,
-    required ExpenseScope scope,
-    String? groupId,
-    SyncStatus syncStatus = SyncStatus.pending,
-    bool isDeleted = false,
-  }) : super(
-    id: id,
-    amount: amount,
-    description: description,
-    date: date,
-    createdBy: createdBy,
-    groupId: groupId,
-    scope: scope,
-    syncStatus: syncStatus,
-    isDeleted: isDeleted,
-  );
+class ExpenseModel {
+  final String id;
+  final double amount;
+  final String description;
+  final DateTime date;
+  final String createdBy;
+  final String groupId;
+  final ExpenseScope scope;
+  final bool isDeleted;
+  final Map<String, double> shares;
+  final Map<String, double> paidBy;
 
-  // Factory: Firestore Document → ExpenseModel
+  const ExpenseModel({
+    required this.id,
+    required this.amount,
+    required this.description,
+    required this.date,
+    required this.createdBy,
+    required this.scope,
+    required this.shares,
+    required this.paidBy,
+    required  this.groupId,
+    this.isDeleted = false,
+  });
+
+  // Firestore → Model
   factory ExpenseModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
     return ExpenseModel(
       id: doc.id,
       amount: (data['amount'] as num).toDouble(),
@@ -36,13 +37,19 @@ class ExpenseModel extends Expense {
       date: (data['date'] as Timestamp).toDate(),
       createdBy: data['createdBy'] ?? '',
       groupId: data['groupId'],
-      scope: data['scope'] == 'group' ? ExpenseScope.group : ExpenseScope.personal,
-      syncStatus: SyncStatus.synced,
+      scope: data['scope'] == 'group'
+          ? ExpenseScope.group
+          : ExpenseScope.personal,
       isDeleted: data['isDeleted'] ?? false,
+      shares: (data['shares'] as Map<String, dynamic>? ?? {})
+          .map((k, v) => MapEntry(k, (v as num).toDouble())),
+
+      paidBy: (data['paidBy'] as Map<String, dynamic>? ?? {})
+          .map((k, v) => MapEntry(k, (v as num).toDouble())),
     );
   }
 
-  // To Firestore Map
+  // Model → Firestore
   Map<String, dynamic> toFirestore() {
     return {
       'amount': amount,
@@ -52,25 +59,28 @@ class ExpenseModel extends Expense {
       'groupId': groupId,
       'scope': scope == ExpenseScope.group ? 'group' : 'personal',
       'isDeleted': isDeleted,
+      'shares': shares,
+      'paidBy': paidBy,
     };
   }
 
-  // Factory: Domain Entity → ExpenseModel
-  factory ExpenseModel.fromEntity(Expense expense) {
+  // Entity → Model
+  factory ExpenseModel.fromEntity(Expense e) {
     return ExpenseModel(
-      id: expense.id,
-      amount: expense.amount,
-      description: expense.description,
-      date: expense.date,
-      createdBy: expense.createdBy,
-      groupId: expense.groupId,
-      scope: expense.scope,
-      syncStatus: expense.syncStatus,
-      isDeleted: expense.isDeleted,
+      id: e.id,
+      amount: e.amount,
+      description: e.description,
+      date: e.date,
+      createdBy: e.createdBy,
+      groupId: e.groupId,
+      scope: e.scope,
+      isDeleted: e.isDeleted,
+      shares: e.split,
+      paidBy: e.paidBy,
     );
   }
 
-  // Convert back to Entity
+  // Model → Entity
   Expense toEntity() {
     return Expense(
       id: id,
@@ -80,8 +90,9 @@ class ExpenseModel extends Expense {
       createdBy: createdBy,
       groupId: groupId,
       scope: scope,
-      syncStatus: syncStatus,
       isDeleted: isDeleted,
+      paidBy: paidBy,
+      split: shares,
     );
   }
 }

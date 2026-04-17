@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../controller/group_controller.dart';
+import 'invite_screeen.dart';
 
 class ContactPermissionScreen extends StatelessWidget {
   const ContactPermissionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final GroupsController controller = Get.find<GroupsController>();
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -21,14 +25,18 @@ class ContactPermissionScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: Icon(Icons.contact_phone_rounded, size: 120, color: Colors.blue),
+                  child: Icon(Icons.contact_phone_rounded,
+                      size: 120, color: Colors.blue),
                 ),
               ),
               const SizedBox(height: 40),
               const Text(
                 'Find Your Friends Fast',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A)),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -41,17 +49,24 @@ class ContactPermissionScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // درخواست دسترسی واقعی
+                  onPressed: () async {
+                    // Request contact permission and fetch contacts
+                    await controller.fetchPhoneContacts();
+                    // Navigate to invite screen after processing
+                    Get.off(() => const InviteFriendsScreen());
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
                     elevation: 0,
                   ),
                   child: const Text(
                     'Allow Access',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                 ),
               ),
@@ -59,7 +74,8 @@ class ContactPermissionScreen extends StatelessWidget {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Maybe Later',
-                    style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+                    style:
+                    TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
               ),
               const SizedBox(height: 20),
             ],

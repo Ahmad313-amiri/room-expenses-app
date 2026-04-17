@@ -1,16 +1,16 @@
 class MemberEntity {
-  final String? id; // برای Isar
   final String firestoreId;
   final String groupId;
   final String userId;
+  final String name;
   final String role;
   final DateTime joinedAt;
   final String invitationStatus;
   final String? invitedBy;
-  final bool isSynced;
+  final bool isAppUser;
+  final String? photoUrl;
 
   MemberEntity({
-    this.id,
     required this.firestoreId,
     required this.groupId,
     required this.userId,
@@ -18,6 +18,8 @@ class MemberEntity {
     required this.joinedAt,
     required this.invitationStatus,
     this.invitedBy,
-    this.isSynced = false,
+    required this.name,
+    this.isAppUser = false,
+    this.photoUrl
   });
 }

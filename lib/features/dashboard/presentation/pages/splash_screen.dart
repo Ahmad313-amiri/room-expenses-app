@@ -13,25 +13,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     // _handleStartupLogic();
-    _goNext();
   }
-
-
-
-  // Navigate to next screen after a short delay
-  Future<void> _goNext() async {
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (!mounted) return;
-
-    Navigator.pushReplacementNamed(context, '/authEntry');
-    // Example:
-    // '/auth'
-    // '/home'
-    // '/onboarding'
-  }
-
-
 
   // // App startup decision logic
   // Future<void> _handleStartupLogic() async {

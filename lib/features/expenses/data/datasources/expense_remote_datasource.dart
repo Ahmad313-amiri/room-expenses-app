@@ -8,40 +8,32 @@ class ExpenseRemoteDataSource {
   ExpenseRemoteDataSource({FirebaseFirestore? firestore})
       : firestore = firestore ?? FirebaseFirestore.instance;
 
-  CollectionReference<Map<String, dynamic>> get _expenseCollection =>
-      firestore.collection('expenses');
+  CollectionReference<Map<String, dynamic>> _collection(String groupId) {
+    return firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('expenses');
+  }
 
-  Future<void> saveExpense(Expense expense) async {
+  Future<void> saveExpense(String groupId, Expense expense) async {
     final model = ExpenseModel.fromEntity(expense);
 
-    await _expenseCollection
+    await _collection(groupId)
         .doc(expense.id)
-        .set(model.toMap(), SetOptions(merge: true));
+        .set(model.toFirestore(), SetOptions(merge: true));
   }
 
-  Future<List<Expense>> getAllExpenses() async {
-    final snapshot = await _expenseCollection.get();
-
-    return snapshot.docs
-        .map((doc) => ExpenseModel.fromMap(doc.data()).toEntity())
-        .toList();
+  Future<void> deleteExpense(String groupId, String expenseId) async {
+    await _collection(groupId)
+        .doc(expenseId)
+        .set({'isDeleted': true}, SetOptions(merge: true));
   }
 
-  Stream<List<Expense>> watchExpenses() {
-    return _expenseCollection.snapshots().map(
+  Stream<List<Expense>> watchExpenses(String groupId) {
+    return _collection(groupId).snapshots().map(
           (snapshot) => snapshot.docs
-          .map((doc) => ExpenseModel.fromMap(doc.data()).toEntity())
+          .map((doc) => ExpenseModel.fromFirestore(doc).toEntity())
           .toList(),
-    );
-  }
-
-  Future<void> softDelete(String id) async {
-    await _expenseCollection.doc(id).set(
-      {
-        'isDeleted': true,
-        'syncStatus': 'synced',
-      },
-      SetOptions(merge: true),
     );
   }
 }

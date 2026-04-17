@@ -1,180 +1,130 @@
-/*
-
-/*// // MODIFIED: اضافه شدن متدهای مربوط به Member و Expense
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import '../../../expenses/data/model/expense_model.dart';
-// import '../../domain/entities/member_entity.dart';
-// import '../models/group_model.dart' hide MemberEntity;
-// import '../models/members_model.dart';
-//
-//
-// class GroupRemoteDataSource {
-//   final FirebaseFirestore firestore;
-//
-//   GroupRemoteDataSource(this.firestore);
-//
-//   CollectionReference get _groups => firestore.collection('groups');
-//   CollectionReference get _members => firestore.collection('members');
-//   CollectionReference get _expenses => firestore.collection('expenses');
-//
-//   // ========== گروه‌ها ==========
-//   Future<String> addGroup(GroupModel group) async {
-//     final doc = await _groups.add({
-//       'name': group.name,
-//       'description': group.description,
-//       'currency': group.currency,
-//       'createdBy': group.createdBy,
-//       'isArchived': group.isArchived,
-//       'createdAt': FieldValue.serverTimestamp(),
-//       'updatedAt': FieldValue.serverTimestamp(),
-//       'settings': {
-//         'allowInvites': group.settings.allowInvites,
-//         'defaultSplitMethod': group.settings.defaultSplitMethod,
-//         'expenseCategories': group.settings.expenseCategories,
-//       },
-//     });
-//     return doc.id;
-//   }
-//
-//   Future<List<GroupModel>> getGroups(String userId) async {
-//     final snapshot = await _groups.where('createdBy', isEqualTo: userId).get();
-//     return snapshot.docs.map((doc) {
-//       final data = doc.data() as Map<String, dynamic>;
-//       return GroupModel()
-//         ..firestoreId = doc.id
-//         ..name = data['name'] ?? ''
-//         ..description = data['description'] ?? ''
-//         ..currency = data['currency'] ?? 'USD'
-//         ..createdBy = data['createdBy'] ?? ''
-//         ..isArchived = data['isArchived'] ?? false
-//         ..createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now()
-//         ..updatedAt = (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-//     }).toList();
-//   }
-//
-//   // ========== اعضا ==========
-//   Future<String> addMember(MemberModel member) async {
-//     final doc = await _members.add({
-//       'groupId': member.groupId,
-//       'userId': member.userId,
-//       'role': member.role,
-//       'joinedAt': FieldValue.serverTimestamp(),
-//       'invitationStatus': member.invitationStatus,
-//       'invitedBy': member.invitedBy,
-//     });
-//     return doc.id;
-//   }
-//
-//   Future<List<MemberEntity>> getMembers(String groupId) async {
-//     final snapshot = await _members.where('groupId', isEqualTo: groupId).get();
-//     return snapshot.docs.map((doc) {
-//       final data = doc.data() as Map<String, dynamic>;
-//       return MemberEntity()
-//         ..firestoreId = doc.id
-//         ..groupId = groupId
-//         ..userId = data['userId'] ?? ''
-//         ..role = data['role'] ?? 'member'
-//         ..joinedAt = (data['joinedAt'] as Timestamp?)?.toDate() ?? DateTime.now()
-//         ..invitationStatus = data['invitationStatus'] ?? 'pending'
-//         ..invitedBy = data['invitedBy'];
-//     }).toList();
-//   }
-//
-//   // ========== خرج‌ها ==========
-//   Future<String> addExpense(ExpenseModel expense) async {
-//     final doc = await _expenses.add({
-//       'groupId': expense.groupId,
-//       'amount': expense.amount,
-//       'description': expense.description,
-//       'paidBy': expense.paidBy,
-//       'splitAmong': expense.splitAmong,
-//       'date': expense.date.toIso8601String(),
-//       'createdAt': FieldValue.serverTimestamp(),
-//     });
-//     return doc.id;
-//   }
-//
-//   Future<List<ExpenseModel>> getExpenses(String groupId) async {
-//     final snapshot = await _expenses.where('groupId', isEqualTo: groupId).get();
-//     return // در group_remote_datasource.dart متد getExpenses
-//     return snapshot.docs.map((doc) {
-//       final data = doc.data() as Map<String, dynamic>;
-//       final model = ExpenseModel()
-//         ..firestoreId = doc.id // حتما ID را اینجا ست کن
-//         ..groupId = groupId
-//         ..amount = (data['amount'] as num).toDouble()
-//         ..description = data['description'] ?? ''
-//         ..paidBy = data['paidBy'] ?? ''
-//         ..date = DateTime.parse(data['date'])
-//         ..splitAmong = List<String>.from(data['splitAmong'] ?? []);
-//       return model;
-//     }).toList();
-//   }
-//   // در فایل group_remote_datasource.dart
-//
-//   Future<List<ExpenseModel>> getExpenses(String groupId) async {
-//     final snapshot = await _expenses.where('groupId', isEqualTo: groupId).get();
-//
-//     return snapshot.docs.map((doc) {
-//       // استفاده از factory که خودتان نوشتید (با کمی اصلاح برای فیلدها)
-//       return ExpenseModel.fromFirestore(doc);
-//     }).toList();
-//   }
-// }
-//
-//
-//
-
- */
-
-
-
-
-
-
- */
-
-
-
-
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/group_model.dart';
-import '../models/members_model.dart';
+import '../models/member_model.dart';
 
 class GroupRemoteDataSource {
   final FirebaseFirestore firestore;
-  GroupRemoteDataSource(this.firestore);
+  final FirebaseStorage storage;
 
-  CollectionReference get _groups => firestore.collection('groups');
+  GroupRemoteDataSource({required this.firestore, required this.storage});
 
+  // ========== Group Methods ==========
   Future<String> addGroup(GroupModel group) async {
-    final doc = await _groups.add({
-      'name': group.name,
-      'description': group.description,
-      'currency': group.currency,
-      'createdBy': group.createdBy,
-      'isArchived': group.isArchived,
-      'createdAt': FieldValue.serverTimestamp(),
-      'settings': {
-        'allowInvites': group.settings.allowInvites,
-        'defaultSplitMethod': group.settings.defaultSplitMethod,
-        'expenseCategories': group.settings.expenseCategories,
-      },
-    });
-    return doc.id;
+    final docRef = firestore.collection('groups').doc();
+    final groupWithId = group.copyWith(id: docRef.id);
+    await docRef.set(groupWithId.toMap());
+    return docRef.id;
   }
 
   Future<List<GroupModel>> getGroups(String userId) async {
-    // فرض: فایربیس گروه‌هایی که کاربر عضو است را برمی‌گرداند
-    final snapshot = await _groups.where('createdBy', isEqualTo: userId).get();
+    final snapshot = await firestore
+        .collection('groups')
+        .where('createdBy', isEqualTo: userId)
+        .where('isArchived', isEqualTo: false)
+        .get();
+    return snapshot.docs.map((doc) => GroupModel.fromMap(doc.data())).toList();
+  }
+
+  Future<void> updateGroup(GroupModel group) async {
+    await firestore.collection('groups').doc(group.id).update(group.toMap());
+  }
+
+  Future<void> archiveGroup(String groupId) async {
+    await firestore.collection('groups').doc(groupId).update({'isArchived': true});
+  }
+
+  Future<String> uploadGroupImage(File imageFile, String fileName) async {
+    final ref = storage.ref().child('group_covers/$fileName');
+    final uploadTask = await ref.putFile(imageFile);
+    return await uploadTask.ref.getDownloadURL();
+  }
+
+  // ========== Member Methods ==========
+  Future<void> addMemberToFirestore(String groupId, MemberModel member) async {
+    final docRef = firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('members')
+        .doc();
+    final memberWithId = member.copyWith(
+      firestoreId: docRef.id,
+    );
+    await docRef.set(memberWithId.toMap());
+  }
+
+  Future<List<MemberModel>> getMembers(String groupId) async {
+    final snapshot = await firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('members')
+        .get();
+
+    print("🔥 FIREBASE MEMBERS COUNT: ${snapshot.docs.length}");
+
+    for (var doc in snapshot.docs) {
+      print("🔥 MEMBER DATA: ${doc.data()}");
+    }
+
+    return snapshot.docs.map(
+          (doc) => MemberModel.fromMap(doc.data(), doc.id),
+    ).toList();
+  }
+
+  Future<void> removeMember(String groupId, String memberId) async {
+    await firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('members')
+        .doc(memberId)
+        .delete();
+  }
+
+  Future<void> updateMemberStatus(String groupId, String memberId, String status) async {
+    await firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('members')
+        .doc(memberId)
+        .update({'invitationStatus': status});
+  }
+
+  // ========== User Search Methods ==========
+  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    if (query.isEmpty) return [];
+
+    final snapshot = await firestore
+        .collection('users')
+        .where('email', isGreaterThanOrEqualTo: query)
+        .where('email', isLessThanOrEqualTo: query + '\uf8ff')
+        .limit(20)
+        .get();
+
     return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      return GroupModel()
-        ..firestoreId = doc.id
-        ..name = data['name'] ?? ''
-        ..description = data['description'] ?? ''
-        ..createdBy = data['createdBy'] ?? ''
-        ..isSynced = true;
+      final data = doc.data();
+      return {
+        'uid': doc.id,
+        'name': data['name'] ?? '',
+        'email': data['email'] ?? '',
+        'photoUrl': data['photoUrl'] ?? '',
+      };
     }).toList();
+  }
+
+  Future<Map<String, dynamic>?> findUserByEmail(String email) async {
+    final snapshot = await firestore
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+    final doc = snapshot.docs.first;
+    return {
+      'uid': doc.id,
+      'name': doc.data()['name'] ?? '',
+      'email': doc.data()['email'] ?? '',
+    };
   }
 }

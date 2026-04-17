@@ -1,77 +1,41 @@
+// lib/features/groups/presentation/pages/group_expense_split_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import '../../domain/entities/member_entity.dart';
+import '../controller/expense_controller.dart';
 
-class SplitMethodScreen extends StatefulWidget {
-  const SplitMethodScreen({super.key});
+class GroupExpenseSplitScreen extends StatefulWidget {
+  final String groupId;
+  final List<MemberEntity> members;
+
+  const GroupExpenseSplitScreen({
+    super.key,
+    required this.groupId,
+    required this.members,
+  });
 
   @override
-  State<SplitMethodScreen> createState() => _SplitMethodScreenState();
+  State<GroupExpenseSplitScreen> createState() => _GroupExpenseSplitScreenState();
 }
 
-class _SplitMethodScreenState extends State<SplitMethodScreen> with SingleTickerProviderStateMixin {
-  // --- Tab controller for syncing tabs and progress dots
-  late TabController _tabController;
-
-  // --- Total expense for this split
-  final double totalExpense = 1200.0;
-
-  // --- Member data
-  final List<Map<String, dynamic>> members = [
-    {'id': 'AM', 'name': 'Alice Miller', 'role': 'You', 'color': Color(0xFFE3F2FD)},
-    {'id': 'BJ', 'name': 'Bob Johnson', 'role': 'Friend', 'color': Color(0xFFFFF3E0)},
-    {'id': 'CR', 'name': 'Charlie Reed', 'role': 'Friend', 'color': Color(0xFFE8F5E9)},
-  ];
-
-  // --- Custom tab controllers & state
-  late Map<String, TextEditingController> _customControllers;
-  double _totalCustom = 800.0; // Initial value as per screenshot
-
-  // --- Percentage tab controllers & state
-  late Map<String, TextEditingController> _percentControllers;
-  double _totalPercent = 100.0; // Initial value as per screenshot
+class _GroupExpenseSplitScreenState extends State<GroupExpenseSplitScreen> {
+  late GroupExpenseSplitController controller;
 
   @override
   void initState() {
     super.initState();
-
-    // --- Initialize tab controller
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {}); // update progress dots and footer
-      }
-    });
-
-    // --- Initialize text controllers with sample values
-    _customControllers = {
-      'AM': TextEditingController(text: '450.00'),
-      'BJ': TextEditingController(text: '350.00'),
-      'CR': TextEditingController(text: '0.00'),
-    };
-
-    _percentControllers = {
-      'AM': TextEditingController(text: '33'),
-      'BJ': TextEditingController(text: '34'),
-      'CR': TextEditingController(text: '33'),
-    };
+    // Register controller only once
+    controller = Get.put(GroupExpenseSplitController(
+      addExpenseUseCase: Get.find(),
+    ));
+    controller.init(widget.groupId, widget.members);
   }
 
-  // --- Update total for Custom tab
-  void _updateCustomTotal() {
-    double sum = 0;
-    _customControllers.forEach((key, controller) {
-      sum += double.tryParse(controller.text) ?? 0;
-    });
-    setState(() => _totalCustom = sum);
-  }
-
-  // --- Update total for Percentage tab
-  void _updatePercentTotal() {
-    double sum = 0;
-    _percentControllers.forEach((key, controller) {
-      sum += double.tryParse(controller.text) ?? 0;
-    });
-    setState(() => _totalPercent = sum);
+  @override
+  void dispose() {
+    // GetX will automatically dispose the controller when the screen is removed
+    super.dispose();
   }
 
   @override
@@ -79,353 +43,281 @@ class _SplitMethodScreenState extends State<SplitMethodScreen> with SingleTicker
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 22),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.close, color: Colors.black),
+          onPressed: () => Get.back(),
         ),
-        title: const Text('Split Method', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'New Group Expense',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
           TextButton(
-            onPressed: () {},
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF1D5CFF), fontSize: 16, fontWeight: FontWeight.w600)),
+            onPressed: controller.saveExpense,
+            child: const Text('Save', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.black,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFF1D5CFF),
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          tabs: const [
-            Tab(text: 'Equal'),
-            Tab(text: 'Custom'),
-            Tab(text: 'Percentage')
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: Obx(() => Form(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 20),
+              const Text('Total Amount', style: TextStyle(color: Colors.grey)),
+              TextFormField(
+                controller: controller.amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  hintText: '0.00',
+                  hintStyle: TextStyle(fontSize: 48, color: Colors.grey),
+                ),
+                onChanged: (_) => controller.updateCustomSharesForMethod(),
+              ),
+              const SizedBox(height: 30),
+              _buildSectionTitle('What was it for?'),
+              TextFormField(
+                controller: controller.descriptionController,
+                decoration: InputDecoration(
+                  hintText: 'Weekend Getaway Dinner',
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+              const SizedBox(height: 25),
+              _buildSectionTitle('Who paid?'),
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: widget.members.length,
+                  itemBuilder: (context, index) => _buildPayerAvatar(widget.members[index]),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    _buildTab('Equally', 'Equally'),
+                    _buildTab('Percentage', 'Percentage'),
+                    _buildTab('Custom', 'Custom'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 25),
+              _buildSectionTitle('Split between'),
+              ...widget.members.map((member) => _buildSplitRow(member)),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('PREVIEW SHARES',
+                            style: TextStyle(color: Colors.blue[800], fontWeight: FontWeight.bold)),
+                        Text('${controller.participantIds.length} people'),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text('Total Accounted', style: TextStyle(color: Colors.grey)),
+                        Text('\$${controller.calculatedTotal.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        if (!controller.isSplitValid && controller.totalAmount > 0)
+                          Text('Diff: \$${(controller.totalAmount - controller.calculatedTotal).toStringAsFixed(2)}',
+                              style: const TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  onPressed: controller.isSplitValid ? controller.saveExpense : null,
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('Confirm Expense', style: TextStyle(fontSize: 18)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A60FF),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      )),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Widget _buildPayerAvatar(MemberEntity member) {
+    return Obx(() {
+      final isSelected = controller.selectedPayerId.value == member.userId;
+      return Padding(
+        padding: const EdgeInsets.only(right: 15),
+        child: InkWell(
+          onTap: () => controller.selectedPayerId.value = member.userId,
+          child: Column(
+            children: [
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: isSelected ? Colors.blue : Colors.grey[200],
+                    child: CircleAvatar(
+                      radius: 27,
+                      backgroundImage: member.photoUrl != null ? NetworkImage(member.photoUrl!) : null,
+                      child: member.photoUrl == null ? Text(member.name[0].toUpperCase()) : null,
+                    ),
+                  ),
+                  if (isSelected)
+                    const Positioned(
+                      bottom: 0, right: 0,
+                      child: CircleAvatar(
+                        radius: 10,
+                        backgroundColor: Colors.blue,
+                        child: Icon(Icons.check, size: 12, color: Colors.white),
+                      ),
+                    )
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(member.name,
+                  style: TextStyle(
+                    color: isSelected ? Colors.blue : Colors.black,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  )),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildTab(String label, String method) {
+    return Obx(() {
+      final isActive = controller.splitMethod.value == method;
+      return Expanded(
+        child: InkWell(
+          onTap: () {
+            controller.splitMethod.value = method;
+            controller.updateCustomSharesForMethod();
+          },
+          child: Container(
+            margin: const EdgeInsets.all(4),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: isActive ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: isActive ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : [],
+            ),
+            child: Center(
+              child: Text(label,
+                  style: TextStyle(
+                    color: isActive ? Colors.blue : Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  )),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildSplitRow(MemberEntity member) {
+    final userId = member.userId;
+    final isCustomEditable = controller.splitMethod.value != 'Equally';
+
+    return Obx(() {
+      final isChecked = controller.participantIds.contains(userId);
+      final share = controller.calculateShares()[userId] ?? 0.0;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(15)),
+        child: Row(
+          children: [
+            Checkbox(
+              value: isChecked,
+              onChanged: (v) {
+                if (v == true) {
+                  if (!controller.participantIds.contains(userId)) controller.participantIds.add(userId);
+                } else {
+                  controller.participantIds.remove(userId);
+                }
+                controller.updateCustomSharesForMethod();
+              },
+              activeColor: Colors.blue,
+            ),
+            CircleAvatar(
+              radius: 15,
+              backgroundImage: member.photoUrl != null ? NetworkImage(member.photoUrl!) : null,
+              child: member.photoUrl == null ? Text(member.name[0].toUpperCase()) : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(member.name, style: const TextStyle(fontWeight: FontWeight.w500))),
+            if (isCustomEditable)
+              SizedBox(
+                width: 80,
+                child: TextFormField(
+                  initialValue: controller.splitMethod.value == 'Percentage'
+                      ? controller.customShares[userId]?.toStringAsFixed(2) ?? '0.00'
+                      : share.toStringAsFixed(2),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textAlign: TextAlign.end,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    suffixText: controller.splitMethod.value == 'Percentage' ? '%' : '',
+                  ),
+                  onChanged: (value) {
+                    final newValue = double.tryParse(value) ?? 0.0;
+                    controller.customShares[userId] = newValue;
+                    controller.customShares.refresh();
+                  },
+                ),
+              )
+            else
+              Text('\$${share.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
           ],
         ),
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 16),
-          _buildProgressDots(), // Animated progress dots
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildEqualTab(),      // Equal tab content
-                _buildCustomTab(),     // Custom tab content
-                _buildPercentageTab()  // Percentage tab content
-              ],
-            ),
-          ),
-          _buildDynamicFooter(), // Dynamic footer
-        ],
-      ),
-    );
-  }
-
-  // --- Progress Dots Widget
-  Widget _buildProgressDots() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (index) {
-        bool isActive = _tabController.index == index;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 24 : 8,
-          height: 6,
-          decoration: BoxDecoration(
-            color: isActive ? const Color(0xFF1D5CFF) : Colors.grey.shade300,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        );
-      }),
-    );
-  }
-
-  // --- Equal Tab
-  Widget _buildEqualTab() {
-    double share = totalExpense / members.length;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildTotalCard(),
-          const SizedBox(height: 24),
-          const Text('SPLIT DETAILS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5)),
-          const SizedBox(height: 12),
-          ...members.map((m) => _buildMemberCard(m, "\$${share.toStringAsFixed(2)}")),
-        ],
-      ),
-    );
-  }
-
-  // --- Custom Tab
-  Widget _buildCustomTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildTotalCard(),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('SPLIT BY MEMBER', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5)),
-              Text('USD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...members.map((m) => _buildInputCard(
-            m,
-            _customControllers[m['id']]!,
-            "\$",
-                (v) => _updateCustomTotal(),
-          )),
-        ],
-      ),
-    );
-  }
-
-  // --- Percentage Tab
-  Widget _buildPercentageTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildPercentageHeaderCard(),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Member Shares', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text('PERCENTAGE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...members.map((m) {
-            double p = double.tryParse(_percentControllers[m['id']]!.text) ?? 0;
-            String calcAmount = (p / 100 * totalExpense).toStringAsFixed(2);
-            return _buildInputCard(
-              m,
-              _percentControllers[m['id']]!,
-              "%",
-                  (v) => _updatePercentTotal(),
-              subText: "(\$$calcAmount)",
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  // --- Total Card Widget
-  Widget _buildTotalCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('TOTAL EXPENSE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 4),
-            Text('\\${totalExpense.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-          ]),
-          const Icon(Icons.receipt_long_outlined, color: Color(0xFF1D5CFF), size: 28)
-        ],
-      ),
-    );
-  }
-
-  // --- Percentage header
-  Widget _buildPercentageHeaderCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Percentage Split', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          Text('Total: \\${totalExpense.toStringAsFixed(2)} | ${members.length} members', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(8)),
-            child: const Text('100% total required', style: TextStyle(color: Color(0xFF1D5CFF), fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Member Card
-  Widget _buildMemberCard(Map<String, dynamic> m, String amount) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
-      child: Row(
-        children: [
-          CircleAvatar(backgroundColor: m['color'], child: Text(m['id'], style: const TextStyle(color: Color(0xFF1D5CFF), fontWeight: FontWeight.bold))),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold)), Text(m['role'], style: const TextStyle(color: Colors.grey, fontSize: 12))])),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(20)),
-            child: Text(amount, style: const TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Input Card for Custom / Percentage
-  Widget _buildInputCard(Map<String, dynamic> m, TextEditingController controller, String symbol, Function(String) onChanged, {String? subText}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
-      child: Row(
-        children: [
-          CircleAvatar(backgroundColor: m['color'], child: Text(m['id'], style: const TextStyle(color: Color(0xFF1D5CFF), fontWeight: FontWeight.bold))),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                if (subText != null) Text(subText, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          ),
-          Container(
-            width: 100,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(12)),
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              onChanged: onChanged,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              decoration: InputDecoration(
-                prefixText: symbol == "\$" ? "\$ " : null,
-                suffixText: symbol == "%" ? " %" : null,
-                border: InputBorder.none,
-                isDense: true,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Dynamic Footer
-  Widget _buildDynamicFooter() {
-    String title = "TOTAL SPLIT";
-    String amount = "\$${totalExpense.toStringAsFixed(2)}";
-    String btnText = "Confirm Split";
-    bool isBalanced = true;
-    double remaining = 0;
-
-    if (_tabController.index == 1) {
-      // Custom tab
-      title = "TOTAL SPECIFIED";
-      amount = "\$${_totalCustom.toStringAsFixed(2)}";
-      remaining = totalExpense - _totalCustom;
-      isBalanced = remaining == 0;
-      btnText = "Confirm Custom Split";
-    } else if (_tabController.index == 2) {
-      // Percentage tab
-      title = "TOTAL PERCENTAGE";
-      amount = "${_totalPercent.toInt()}%";
-      isBalanced = _totalPercent == 100;
-      btnText = "Confirm Percentage Split";
-    }
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 34),
-      decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade100))),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                Row(
-                  children: [
-                    Text(amount, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isBalanced ? const Color(0xFF2ECC71) : const Color(0xFF1D5CFF))),
-                    if (isBalanced)
-                      const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.check_circle, color: Color(0xFF2ECC71), size: 20)),
-                  ],
-                ),
-              ]),
-              if (_tabController.index == 1 && !isBalanced)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('REMAINING', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    Text('\\${remaining.abs().toStringAsFixed(2)}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: remaining > 0 ? Colors.orange : Colors.red)),
-                  ],
-                ),
-              if (_tabController.index == 0)
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: const [
-                  Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                  Text('Balanced', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2ECC71))),
-                ]),
-            ],
-          ),
-          if (_tabController.index == 2)
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: _totalPercent / 100,
-                  backgroundColor: Colors.grey.shade100,
-                  color: isBalanced ? const Color(0xFF2ECC71) : const Color(0xFF1D5CFF),
-                  minHeight: 6,
-                ),
-              ),
-            ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: isBalanced ? () {} : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1D5CFF),
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(btnText, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: Colors.white),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+      );
+    });
   }
 }

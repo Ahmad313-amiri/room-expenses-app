@@ -29,7 +29,6 @@ class ExpenseBinding extends Bindings {
     Get.lazyPut(() => UpdateExpenseUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => DeleteExpenseUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => WatchGroupExpensesUseCase(Get.find()), fenix: true);
-    Get.lazyPut(() => WatchGroupExpensesUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => CalculateGroupSettlementUseCase(), fenix: true);
   }
 }

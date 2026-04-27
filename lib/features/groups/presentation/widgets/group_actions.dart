@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../settelment/presentation/pages/advance_settlment_screen.dart';
 import '../controller/group_controller.dart';
-import '../pages/advance_settle_screen.dart';
 import '../pages/split_method.dart';
 
 class GroupActionsWidget extends StatelessWidget {
@@ -17,7 +17,16 @@ class GroupActionsWidget extends StatelessWidget {
           Expanded(
             child: ElevatedButton.icon(
               onPressed: () {
-                Get.to(() => const AdvancedSettleUpScreen());
+                final groupId = controller.groupId.value;
+
+                if (groupId.isEmpty) {
+                  Get.snackbar("Error", "Group not loaded yet");
+                  return;
+                }
+
+                Get.to(() => AdvancedSettleUpScreen(
+                  groupId: groupId,
+                ));
               },
               icon: const Icon(Icons.handshake_outlined, size: 18),
               label: const Text('Settle Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -34,8 +43,15 @@ class GroupActionsWidget extends StatelessWidget {
           Expanded(
             child: ElevatedButton.icon(
               onPressed: () {
-                 Get.to(() => GroupExpenseSplitScreen(
-                  groupId: controller.groupId.value,
+                final groupId = controller.groupId.value;
+
+                if (groupId.isEmpty) {
+                  Get.snackbar("Error", "Group not loaded yet");
+                  return;
+                }
+
+                Get.to(() => GroupExpenseSplitScreen(
+                  groupId: groupId,
                   members: controller.members,
                 ));
               },

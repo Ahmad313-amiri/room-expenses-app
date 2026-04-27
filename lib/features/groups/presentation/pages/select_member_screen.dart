@@ -21,6 +21,10 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
   void initState() {
     super.initState();
     _refreshContacts();
+      debugPrint("🔥 SelectMembersScreen INIT");
+      final args = Get.arguments;
+      debugPrint("📦 Arguments: $args");
+
   }
 
   Future<void> _refreshContacts() async {
@@ -115,6 +119,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
   }
 
   Widget _buildAppUsersTab() {
+
     return Column(
       children: [
         Padding(
@@ -221,7 +226,32 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        onPressed: () => Get.back(result: _selectedMembers.values.toList()),
+        onPressed: () async {
+          try {
+            final selected = _selectedMembers.values.toList();
+
+            await controller.addSelectedMembers(selected);
+
+            Get.snackbar(
+              "Success",
+              "Members added successfully",
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.green,
+              colorText: Colors.white,
+            );
+
+            Get.back(result: true);
+
+          } catch (e) {
+            Get.snackbar(
+              "Error",
+              e.toString(),
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+          }
+        },
         child: Text('Confirm (${_selectedMembers.length} Members)',
             style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
       ),

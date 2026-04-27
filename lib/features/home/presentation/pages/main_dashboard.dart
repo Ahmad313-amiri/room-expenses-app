@@ -1,6 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-
+import 'package:get/get.dart';
+import 'package:roomly/features/home/presentation/pages/activity_page.dart';
+import '../../../activity/presentation/activity_widget.dart';
+import '../../../activity/presentation/controller/activity_controller.dart';
+import '../../../activity/domain/entity/activity.dart';
+import '../../../groups/presentation/controller/group_controller.dart';
 import '../widgets/activity_card.dart';
 import '../widgets/owed_card.dart';
 
@@ -12,150 +17,67 @@ class MainDashboard extends StatefulWidget {
 }
 
 class _MainDashboardState extends State<MainDashboard> {
-  double amount = 1250.00;
+  late GroupsController groupController;
+  late ActivityController activityController;
+  bool _isInitialLoading = true;
 
-  List<AcitivityCard> activities = [
-    AcitivityCard(
-      icon: Icons.home,
-      amount: 1135.99,
-      description: 'eat dinner ',
-      status: 'pending',
-      time: 'Today',
-      title: 'eating dinner',
-      iconColor: Colors.green,
-    ),
-    AcitivityCard(
-      icon: Icons.home,
-      amount: 1135.99,
-      description: 'eat dinner ',
-      status: 'pending',
-      time: 'Today',
-      title: 'eating dinner',
-      iconColor: Colors.green,
-    ),
-    AcitivityCard(
-      icon: Icons.home,
-      amount: 1135.99,
-      description: 'eat dinner ',
-      status: 'pending',
-      time: 'Today',
-      title: 'eating dinner',
-      iconColor: Colors.green,
-    ),
-    AcitivityCard(
-      icon: Icons.home,
-      amount: 1135.99,
-      description: 'eat dinner ',
-      status: 'pending',
-      time: 'Today',
-      title: 'eating dinner',
-      iconColor: Colors.green,
-    ),
-    AcitivityCard(
-      icon: Icons.home,
-      amount: 1135.99,
-      description: 'eat dinner ',
-      status: 'pending',
-      time: 'Today',
-      title: 'eating dinner',
-      iconColor: Colors.green,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    if (!Get.isRegistered<GroupsController>()) {
+      // Register if needed
+    }
+    groupController = Get.find<GroupsController>();
+    if (!Get.isRegistered<ActivityController>()) {
+      Get.put(ActivityController());
+    }
+    activityController = Get.find<ActivityController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboardData());
+  }
+
+  Future<void> _loadDashboardData() async {
+    setState(() => _isInitialLoading = true);
+    try {
+      await groupController.fetchGroups(initialLoad: true);
+      await activityController.fetchAllActivities(initialLoad: true);
+    } catch (_) {
+      // Handled in UI
+    }
+    if (mounted) setState(() => _isInitialLoading = false);
+  }
+
+  Future<void> _onRefresh() async {
+    try {
+      await groupController.refreshGroups();
+      await activityController.refreshAll();
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Icon(Icons.person),
+    if (_isInitialLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      'Dashboard',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                CircleAvatar(
-                  child: IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    onPressed: () {},
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          //card section
-          Container(
-            width: 600,
-            margin: EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.blue,
-              borderRadius: BorderRadius.circular(15),
-            ),
-
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'TOTALNET STANDING',
-                        style: TextStyle(color: Colors.grey[200]),
-                      ),
-                      Text(
-                        '${amount >= 0 ? '+' : '-'}\$${amount.abs().toStringAsFixed(2)}',
+                  const Icon(Icons.person),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'Dashboard',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: amount >= 0 ? Colors.green : Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(25),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        width: 200,
-                        padding: EdgeInsets.symmetric(vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.trending_up, color: Colors.white),
-                            const SizedBox(width: 6),
-                            const Text(
-                              '% increase this month',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ),
@@ -163,88 +85,254 @@ class _MainDashboardState extends State<MainDashboard> {
                 ],
               ),
             ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-
-            children: [
-              //you are owed , card
-              Padding(
-                padding: const EdgeInsets.only(left: 15, right: 3),
-                child: OwedCard(
-                  icon: Icons.north_east_outlined,
-                  iconColor: Colors.green,
-                  owedText: 'you are owed ',
-                  amount: '4500',
+            // Net Standing Card
+            Obx(() {
+              final net =
+                  activityController.totalYouAreOwed.value -
+                  activityController.totalYouOwe.value;
+              return Container(
+                width: 600,
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 10,
                 ),
-              ),
-              //   you owed card
-              Expanded(
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 18, left: 5),
-                  child: OwedCard(
-                    icon: Icons.south_west_rounded,
-                    iconColor: Colors.red,
-                    owedText: 'you owe ',
-                    amount: '4500',
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'TOTAL NET STANDING',
+                        style: TextStyle(color: Colors.grey[200]),
+                      ),
+                      Text(
+                        '${net >= 0 ? '+' : '-'}\$${net.abs().toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: net >= 0 ? Colors.green : Colors.red,
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(25),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            width: 200,
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.trending_up, color: Colors.white),
+                                SizedBox(width: 6),
+                                Text(
+                                  '% increase this month',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              );
+            }),
+            // Owed Cards
+            Obx(() {
+              final owed = activityController.totalYouAreOwed.value;
+              final owe = activityController.totalYouOwe.value;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 15, right: 3),
+                    child: OwedCard(
+                      icon: Icons.north_east_outlined,
+                      iconColor: Colors.green,
+                      owedText: 'you are owed',
+                      amount: owed.toStringAsFixed(2),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 18, left: 5),
+                      child: OwedCard(
+                        icon: Icons.south_west_rounded,
+                        iconColor: Colors.red,
+                        owedText: 'you owe',
+                        amount: owe.toStringAsFixed(2),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }),
+            // Recent Activity Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recent Activity',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  GestureDetector(
+                    onTap: () => Get.to(ActivityScreen()),
+                    child: const Text(
+                      'View all',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-
-          //   Recent activity and veiw all
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Recent Activity ',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-                Text(
-                  'Veiw all ',
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
             ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: ListView.builder(
-                itemCount: activities.length,
-                physics: const BouncingScrollPhysics(),
-                itemBuilder: (context, index) {
-                  return Container(
-                    padding: EdgeInsets.only(bottom: 10),
-                    margin: EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
 
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
+            Expanded(
+              child: Obx(() {
+                if (activityController.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (activityController.errorMessage.isNotEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          activityController.errorMessage.value,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 16,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try Again'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _onRefresh,
                         ),
                       ],
                     ),
-                    child: activities[index],
                   );
-                },
-              ),
+                }
+
+                final recent = activityController.activities.take(5).toList();
+                if (recent.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.inbox, size: 64, color: Colors.grey),
+                        SizedBox(height: 12),
+                        Text(
+                          'No expenses or settlements found yet.',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: ListView.builder(
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: recent.length,
+                    itemBuilder: (context, index) {
+                      final act = recent[index];
+                      return GestureDetector(
+                        onTap: () {
+                             if ((act as dynamic)?.groupId != null &&
+                              (act as dynamic).groupId is String &&
+                              ((act as dynamic).groupId as String).isNotEmpty) {
+                            Get.toNamed(
+                              '/group-details',
+                              arguments: {'groupId': (act as dynamic).groupId},
+                            );
+                          }
+                          // Else do nothing or custom
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ActivityCard(
+                            icon: act.type == ActivityType.expense
+                                ? Icons.receipt_long
+                                : Icons.swap_horiz,
+                            amount: act.amount ?? 0.0,
+                            description: act.type == ActivityType.expense
+                                ? act.description ?? ''
+                                : '${act.from} → ${act.to}',
+                            status: act.status ?? '',
+                            time: _formatDate(act.date),
+                            title: act.type == ActivityType.expense
+                                ? act.description ?? 'Expense'
+                                : 'Settlement',
+                            iconColor: act.type == ActivityType.expense
+                                ? Colors.blue
+                                : Colors.green,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
             ),
-          ),
-          const SizedBox(height: 10),
-        ],
+            const SizedBox(height: 10),
+          ],
+        ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    if (date.day == now.day &&
+        date.month == now.month &&
+        date.year == now.year) {
+      return 'Today';
+    } else if (date.day == now.subtract(const Duration(days: 1)).day) {
+      return 'Yesterday';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 }

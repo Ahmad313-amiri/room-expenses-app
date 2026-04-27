@@ -43,6 +43,7 @@ class GroupBinding extends Bindings {
     Get.put(SearchUsersUseCase(remoteDS), permanent: true);
     Get.put(UpdateMemberStatus(repo), permanent: true);
 
+
     // ========== Register Controller ==========
     Get.put<GroupsController>(
       GroupsController(

@@ -2,8 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../../../expenses/presentations/controller/expense_controller.dart';
 import '../../domain/entities/member_entity.dart';
-import '../controller/expense_controller.dart';
+
 
 class GroupExpenseSplitScreen extends StatefulWidget {
   final String groupId;
@@ -25,16 +26,16 @@ class _GroupExpenseSplitScreenState extends State<GroupExpenseSplitScreen> {
   @override
   void initState() {
     super.initState();
-    // Register controller only once
+    print("WIDGET GROUP ID = ${widget.groupId}");
     controller = Get.put(GroupExpenseSplitController(
       addExpenseUseCase: Get.find(),
-    ));
+    )
+    );
     controller.init(widget.groupId, widget.members);
   }
 
   @override
   void dispose() {
-    // GetX will automatically dispose the controller when the screen is removed
     super.dispose();
   }
 

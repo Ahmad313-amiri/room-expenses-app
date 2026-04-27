@@ -16,6 +16,18 @@ class ExpenseRemoteDataSource {
   }
 
   Future<void> saveExpense(String groupId, Expense expense) async {
+    if (groupId.isEmpty) {
+      throw Exception("Group ID is empty");
+    }
+
+    if (expense.amount <= 0) {
+      throw Exception("Invalid amount");
+    }
+
+    if (expense.description.trim().isEmpty) {
+      throw Exception("Description required");
+    }
+
     final model = ExpenseModel.fromEntity(expense);
 
     await _collection(groupId)

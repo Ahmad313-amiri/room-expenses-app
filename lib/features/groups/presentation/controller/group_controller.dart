@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:get/get.dart';
@@ -17,316 +18,9 @@ import '../../domain/usecases/get_members.dart';
 import '../../domain/usecases/search_users_usecase.dart';
 import '../../domain/usecases/update_member_status.dart';
 import 'dart:io';
-
-/*class GroupsController extends GetxController {
-  final SearchUsersUseCase searchUsersUseCase;
-  final GetGroups getGroupsUseCase;
-  final CreateGroup createGroupUseCase;
-  final AddMember addMemberUseCase;
-  final ArchiveGroup archiveGroupUseCase;
-  final GetMembers getMembersUseCase;
-  final GroupRemoteDataSource remoteDataSource;
-  final UpdateMemberStatus updateMemberStatusUseCase;
-
-  GroupsController({
-    required this.searchUsersUseCase,
-    required this.getGroupsUseCase,
-    required this.createGroupUseCase,
-    required this.addMemberUseCase,
-    required this.archiveGroupUseCase,
-    required this.getMembersUseCase,
-    required this.remoteDataSource,
-    required this.updateMemberStatusUseCase,
-  });
-
-  var groups = <GroupEntity>[].obs;
-  var members = <MemberEntity>[].obs;
-  var isLoading = false.obs;
-  var searchResults = <Map<String, dynamic>>[].obs;
-  var isSearching = false.obs;
-  var searchError = ''.obs;
-  var contacts = <Contact>[].obs;
-  var allGroups = <GroupModel>[].obs;
-
-  void filterGroups(String query) {
-    if (query.isEmpty) {
-      groups.value = allGroups;
-    } else {
-      groups.value = allGroups
-          .where((g) => g.name.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    }
-  }
-
-  Timer? _debounce;
-  bool _isDisposed = false;
-
-  @override
-  void onInit() {
-    super.onInit();
-    _isDisposed = false;
-    fetchGroups();
-  }
-
-  @override
-  void onClose() {
-    _isDisposed = true;
-    _debounce?.cancel();
-    super.onClose();
-  }
-
-  Future<void> fetchGroups() async {
-    try {
-      isLoading.value = true;
-
-
-      final authRepo = Get.find<AuthenticationRepository>();
-      final uid = authRepo.firebaseUser.value?.uid;
-
-      if (uid == null) {
-        print("❌ User is null");
-        return;
-      }
-
-      final remoteGroups = await getGroupsUseCase.call(uid);
-
-      print("🔥 fetchGroups called");
-      print("🔥 groups from server: $remoteGroups");
-
-      groups.assignAll(remoteGroups);
-      allGroups.assignAll(remoteGroups as Iterable<GroupModel>);
-    } catch (e) {
-      print("Error fetching groups: $e");
-      _showErrorSnackbar("Failed to load groups", e.toString());
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<String?> createNewGroup(GroupEntity group) async {
-    try {
-      isLoading.value = true;
-      if (group.name.trim().isEmpty) throw Exception("Group name cannot be empty");
-      final remoteId = await createGroupUseCase.call(group);
-      await fetchGroups();
-      _showSuccessSnackbar("Group created successfully");
-      return remoteId;
-    } catch (e) {
-      print("Create Group Error: $e");
-      _showErrorSnackbar("Failed to create group", e.toString());
-      return null;
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  Future<void> updateGroupDetails(GroupEntity group) async {
-    try {
-      isLoading.value = true;
-      if (group.id.isEmpty) throw Exception("Invalid group ID");
-      await remoteDataSource.updateGroup(GroupModel.fromEntity(group));
-      await fetchGroups();
-      _showSuccessSnackbar("Group updated successfully");
-    } catch (e) {
-      print("Update Group Error: $e");
-      _showErrorSnackbar("Failed to update group", e.toString());
-      rethrow;
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  Future<void> archiveSelectedGroup(String groupId) async {
-    try {
-      isLoading.value = true;
-      if (groupId.isEmpty) throw Exception("Invalid group ID");
-      await archiveGroupUseCase.call(groupId);
-      groups.removeWhere((g) => g.id == groupId);
-      _showSuccessSnackbar("Group archived successfully");
-    } catch (e) {
-      print("Archive Group Error: $e");
-      _showErrorSnackbar("Failed to archive group", e.toString());
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  Future<void> loadMembers(String groupId) async {
-    try {
-      isLoading.value = true;
-      if (groupId.isEmpty) throw Exception("Invalid group ID");
-      final remoteMembers = await getMembersUseCase.call(groupId) ?? [];
-      final acceptedMembers = remoteMembers.where((m) => m.invitationStatus == 'accepted').toList();
-      if (!_isDisposed) members.assignAll(acceptedMembers);
-    } catch (e) {
-      print("Error loading members: $e");
-      _showErrorSnackbar("Failed to load members", e.toString());
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  /// Adds a member to the group, checking for duplicates and user existence.
-  Future<void> addMemberToGroup(String groupId, String identifier, String name) async {
-    try {
-      if (groupId.isEmpty || identifier.isEmpty || name.isEmpty) {
-        throw Exception("All fields are required");
-      }
-      isLoading.value = true;
-      final userData = await remoteDataSource.findUserByEmail(identifier.trim().toLowerCase());
-
-      // Check for duplicate user
-      if (members.any((m) => m.userId == (userData?['uid'] ?? identifier))) {
-        _showErrorSnackbar("Duplicate member", "This user is already added to the group.");
-        return;
-      }
-
-      final newMember = MemberEntity(
-        groupId: groupId,
-        userId: userData?['uid'] ?? identifier,
-        name: userData?['name'] ?? name,
-        role: userData != null ? 'member' : 'guest',
-        joinedAt: DateTime.now(),
-        invitationStatus: userData != null ? 'accepted' : 'pending',
-        invitedBy: null,
-        isAppUser: userData != null,
-        firestoreId: '',
-      );
-      await addMemberUseCase.call(groupId, newMember);
-      await loadMembers(groupId);
-      _showSuccessSnackbar("Member added successfully");
-    } catch (e) {
-      _showErrorSnackbar("Failed to add member", e.toString());
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<void> removeMemberFromGroup(String groupId, String userId) async {
-    try {
-      isLoading.value = true;
-      if (groupId.isEmpty || userId.isEmpty) throw Exception("Invalid group or user ID");
-      await remoteDataSource.removeMember(groupId, userId);
-      members.removeWhere((m) => m.userId == userId);
-      _showSuccessSnackbar("Member removed successfully");
-    } catch (e) {
-      print("Error removing member: $e");
-      _showErrorSnackbar("Failed to remove member", e.toString());
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  Future<void> updateMemberStatus(String groupId, String userId, String status) async {
-    try {
-      isLoading.value = true;
-      if (groupId.isEmpty || userId.isEmpty || status.isEmpty) {
-        throw Exception("Invalid parameters");
-      }
-      final memberIndex = members.indexWhere((m) => m.userId == userId && m.groupId == groupId);
-      if (memberIndex == -1) throw Exception("Member not found");
-      await updateMemberStatusUseCase.call(groupId, userId, status);
-      final member = members[memberIndex];
-      final updatedMember = MemberEntity(
-         groupId: member.groupId,
-        userId: member.userId,
-        name: member.name,
-        role: member.role,
-        joinedAt: member.joinedAt,
-        invitationStatus: status,
-        invitedBy: member.invitedBy,
-        isAppUser: member.isAppUser,
-        firestoreId: '',
-      );
-      members[memberIndex] = updatedMember;
-      _showSuccessSnackbar("Status updated to: $status");
-    } catch (e) {
-      print("Error updating member status: $e");
-      _showErrorSnackbar("Failed to update status", e.toString());
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  Future<void> acceptGroupInvitation({required String groupId, required String userId}) async {
-    try {
-      await updateMemberStatus(groupId, userId, 'accepted');
-    } catch (e) {
-      _showErrorSnackbar("Failed to accept invitation", e.toString());
-    }
-  }
-
-  void onSearchChanged(String query) {
-    _debounce?.cancel();
-    if (query.isEmpty) {
-      searchResults.clear();
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 400), () => searchUsers(query));
-  }
-
-  Future<void> searchUsers(String query) async {
-    if (query.trim().length < 2) {
-      searchResults.clear();
-      return;
-    }
-    try {
-      isSearching.value = true;
-      searchError.value = '';
-      final results = await searchUsersUseCase.call(query.trim());
-      if (!_isDisposed) searchResults.assignAll(results);
-    } catch (e) {
-      print("Search Error: $e");
-      searchError.value = "Search failed: ${e.toString()}";
-      searchResults.clear();
-      if (e.toString().contains("timeout")) {
-        _showErrorSnackbar("Search timed out", "Please try again");
-      } else if (e.toString().contains("internet")) {
-        _showErrorSnackbar("No internet", "Check your connection");
-      }
-    } finally {
-      if (!_isDisposed) isSearching.value = false;
-    }
-  }
-
-  Future<void> fetchPhoneContacts() async {
-    try {
-      final status = await FlutterContacts.permissions.request(PermissionType.readWrite);
-      if (status != PermissionStatus.granted) {
-        _showErrorSnackbar("Permission denied", "Cannot access contacts");
-        return;
-      }
-      final fetchedContacts = await FlutterContacts.getAll();
-      if (!_isDisposed) contacts.assignAll(fetchedContacts);
-    } catch (e) {
-      print("Error fetching contacts: $e");
-      _showErrorSnackbar("Failed to load contacts", e.toString());
-    }
-  }
-
-  void _showSuccessSnackbar(String message) {
-    if (_isDisposed) return;
-    Get.snackbar('Success', message,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2));
-  }
-
-  void _showErrorSnackbar(String title, String message) {
-    if (_isDisposed) return;
-    Get.snackbar(title, message,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3));
-  }
-}
-
- */
-
-
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:image_picker/image_picker.dart';
 
 class GroupsController extends GetxController {
   final SearchUsersUseCase searchUsersUseCase;
@@ -359,7 +53,7 @@ class GroupsController extends GetxController {
   var allGroups = <GroupModel>[].obs;
   var groupId = ''.obs;
 
-  // --- NEW FIELDS FOR GroupDetailScreen ---
+  // --- GroupDetailScreen ---
   final currentGroup = Rxn<GroupEntity>();
   final groupImageFile = Rxn<File>();
   final isLoadingImage = false.obs;
@@ -367,11 +61,17 @@ class GroupsController extends GetxController {
 
   Timer? _debounce;
   bool _isDisposed = false;
+  StreamSubscription<QuerySnapshot>? _expenseSubscription;
+
+  final Connectivity _connectivity = Connectivity();
+  final RxBool _isOnline = true.obs;
+  bool get isOnline => _isOnline.value;
 
   @override
   void onInit() {
     super.onInit();
     _isDisposed = false;
+    _monitorConnectivity();
     fetchGroups();
   }
 
@@ -379,51 +79,85 @@ class GroupsController extends GetxController {
   void onClose() {
     _isDisposed = true;
     _debounce?.cancel();
+    _expenseSubscription?.cancel();
     super.onClose();
   }
+
+  void _monitorConnectivity() {
+    _connectivity.onConnectivityChanged.listen((result) {
+      _isOnline.value = result != ConnectivityResult.none;
+      if (_isOnline.value) {
+        fetchGroups();
+        if (currentGroup.value != null)
+          loadGroupAndMembers(currentGroup.value!.id);
+      }
+    });
+  }
+
   String? get currentUserId {
     final authRepo = Get.find<AuthenticationRepository>();
     return authRepo.firebaseUser.value?.uid;
   }
+
   bool canRemoveMember(MemberEntity member) {
     final currentUser = members.firstWhereOrNull(
-          (m) => m.userId == currentUserId,
+      (m) => m.userId == currentUserId,
     );
-
     if (currentUser == null) return false;
     final isAdmin = currentUser.role == 'admin';
     final isSelf = member.userId == currentUserId;
-
     return isAdmin && !isSelf;
   }
+
   // ------------------------------------------------------------
   // GROUP FETCHING & FILTERING
   // ------------------------------------------------------------
-  Future<void> fetchGroups() async {
+
+  Future<void> fetchGroups({
+    bool forceRefresh = false,
+    bool initialLoad = false,
+  }) async {
     try {
       isLoading.value = true;
       final authRepo = Get.find<AuthenticationRepository>();
       final uid = authRepo.firebaseUser.value?.uid;
       if (uid == null) {
-        print("❌ User is null");
+        print("User not logged in");
         isLoading.value = false;
         return;
       }
-
-      final remoteGroups = await getGroupsUseCase.call(uid);
-      print("🔥 fetchGroups called - count: ${remoteGroups.length}");
-
-      // Safe type conversion: assume remoteGroups are GroupEntity, map to GroupModel if needed
-      final List<GroupModel> models = remoteGroups.map((e) {
-        if (e is GroupModel) return e;
-        return GroupModel.fromEntity(e);
-      }).toList();
-
+      if (!_isOnline.value && !forceRefresh) {
+        if (!initialLoad) {
+          _showErrorSnackbar(
+            "Offline",
+            "You are offline. Showing cached data.",
+          );
+        }
+        return;
+      }
+      final remoteGroups = await getGroupsUseCase
+          .call(uid)
+          .timeout(Duration(seconds: 15));
+      final models = remoteGroups
+          .map((e) => e is GroupModel ? e : GroupModel.fromEntity(e))
+          .toList();
       groups.assignAll(models);
       allGroups.assignAll(models);
     } catch (e) {
-      print("Error fetching groups: $e");
-      _showErrorSnackbar("Failed to load groups", e.toString());
+      print("Fetch groups error: $e");
+      if (!initialLoad) {
+        if (e is TimeoutException) {
+          _showErrorSnackbar(
+            "Timeout",
+            "Network took too long. Please try again.",
+          );
+        } else {
+          _showErrorSnackbar(
+            "Network Error",
+            "Failed to load groups. Check your internet.",
+          );
+        }
+      }
     } finally {
       isLoading.value = false;
     }
@@ -442,20 +176,31 @@ class GroupsController extends GetxController {
   // ------------------------------------------------------------
   // GROUP CRUD
   // ------------------------------------------------------------
-  Future<String?> createNewGroup(GroupEntity group) async {
+
+  Future<String?> createNewGroup(GroupEntity group, {File? imageFile}) async {
     try {
       isLoading.value = true;
-      if (group.name.trim().isEmpty) throw Exception("Group name cannot be empty");
+      if (group.name.trim().isEmpty) throw Exception("Group name required");
+      if (!_isOnline.value) throw Exception("No internet connection");
       final remoteId = await createGroupUseCase.call(group);
+      if (imageFile != null) {
+        final imageUrl = await uploadGroupImage(imageFile, remoteId);
+        if (imageUrl != null) {
+          final updatedGroup = (group as GroupModel).copyWith(
+            coverImageUrl: imageUrl,
+          );
+          await updateGroupDetails(updatedGroup);
+        }
+      }
       await fetchGroups();
       _showSuccessSnackbar("Group created successfully");
       return remoteId;
     } catch (e) {
-      print("Create Group Error: $e");
-      _showErrorSnackbar("Failed to create group", e.toString());
+      print(e);
+      _showErrorSnackbar("Creation Failed", e.toString());
       return null;
     } finally {
-      if (!_isDisposed) isLoading.value = false;
+      isLoading.value = false;
     }
   }
 
@@ -482,30 +227,40 @@ class GroupsController extends GetxController {
   Future<void> deleteSelectedGroup(String groupId) async {
     try {
       isLoading.value = true;
-      if (groupId.isEmpty) throw Exception("Invalid group ID");
+      if (!_isOnline.value) throw Exception("No internet connection");
       await deleteGroupUseCase.call(groupId);
       groups.removeWhere((g) => g.id == groupId);
       allGroups.removeWhere((g) => g.id == groupId);
-      currentGroup.value = null;
-      _showSuccessSnackbar("Group deleted successfully");
+      if (currentGroup.value?.id == groupId) currentGroup.value = null;
+      _showSuccessSnackbar("Group deleted");
+      Get.offAll(() => const HomeScreen());
+      final homeController = Get.find<HomeController>();
+      homeController.changeTab(1);
     } catch (e) {
-      print("Delete Group Error: $e");
-      _showErrorSnackbar("Failed to delete  group", e.toString());
+      _showErrorSnackbar("Delete Failed", e.toString());
     } finally {
-      if (!_isDisposed) isLoading.value = false;
+      isLoading.value = false;
     }
+  }
+
+  Future<void> refreshGroups() async {
+    await fetchGroups(forceRefresh: true, initialLoad: false);
+  }
+
+  Future<void> refreshGroupDetail(String groupId) async {
+    await loadGroupAndMembers(groupId, forceRefresh: true);
   }
 
   // ------------------------------------------------------------
   // MEMBERS MANAGEMENT
   // ------------------------------------------------------------
+
   Future<void> loadMembers(String groupId) async {
     try {
       isLoading.value = true;
       if (groupId.isEmpty) throw Exception("Invalid group ID");
       final remoteMembers = await getMembersUseCase.call(groupId) ?? [];
       members.assignAll(remoteMembers);
-      // if (!_isDisposed) members.assignAll(acceptedMembers);
       print("RAW MEMBERS COUNT: ${remoteMembers.length}");
       for (var m in remoteMembers) {
         print("MEMBER: ${m.userId} | ${m.name} | ${m.invitationStatus}");
@@ -518,50 +273,72 @@ class GroupsController extends GetxController {
     }
   }
 
-  Future<void> addMemberToGroup(String groupId, String identifier, String name) async {
+  Future<void> addMemberToGroup(
+    String groupId,
+    String identifier,
+    String name,
+  ) async {
+    debugPrint("━━━━━━━━━━━━━━━━━━━━━━");
+    debugPrint("➕ ADD MEMBER FLOW START");
+    debugPrint("groupId: $groupId");
+    debugPrint("identifier: $identifier");
+    debugPrint("name: $name");
+    debugPrint("━━━━━━━━━━━━━━━━━━━━━━");
+
     try {
+      isLoading.value = true;
       if (groupId.isEmpty || identifier.isEmpty || name.isEmpty) {
         throw Exception("All fields are required");
       }
-      isLoading.value = true;
-
-      // Ensure members are loaded before checking duplicates
       if (members.isEmpty) {
         await loadMembers(groupId);
       }
-
-      final userData = await remoteDataSource.findUserByEmail(identifier.trim().toLowerCase());
-
-      if (members.any((m) => m.userId == (userData?['uid'] ?? identifier))) {
-        _showErrorSnackbar("Duplicate member", "This user is already added to the group.");
+      final value = identifier.trim().toLowerCase();
+      final userData = await remoteDataSource.findUserByEmail(value);
+      final resolvedUserId = userData?['uid'] ?? value;
+      final existingMember = members.firstWhereOrNull(
+        (m) => m.userId == resolvedUserId,
+      );
+      if (existingMember != null) {
+        if (existingMember.invitationStatus == 'pending') {
+          _showErrorSnackbar("Already invited", "Invitation is still pending");
+        } else {
+          _showErrorSnackbar(
+            "Already member",
+            "User already exists in this group",
+          );
+        }
         return;
       }
-
       final newMember = MemberEntity(
         groupId: groupId,
-        userId: userData?['uid'] ?? identifier,
+        userId: resolvedUserId,
         name: userData?['name'] ?? name,
         role: userData != null ? 'member' : 'guest',
+        invitationStatus: 'pending',
         joinedAt: DateTime.now(),
-        invitationStatus: userData != null ? 'accepted' : 'pending',
-        invitedBy: null,
+        invitedBy: currentUserId,
         isAppUser: userData != null,
-        firestoreId: '', // will be set by backend
+        firestoreId: '',
       );
+      debugPrint("📨 Creating PENDING invitation...");
       await addMemberUseCase.call(groupId, newMember);
       await loadMembers(groupId);
-      _showSuccessSnackbar("Member added successfully");
-    } catch (e) {
+      _showSuccessSnackbar("Invitation sent successfully");
+    } catch (e, stack) {
+      debugPrint(" ERROR: $e");
+      debugPrint("STACK: $stack");
       _showErrorSnackbar("Failed to add member", e.toString());
     } finally {
-      if (!_isDisposed) isLoading.value = false;
+      isLoading.value = false;
     }
   }
 
   Future<void> removeMemberFromGroup(String groupId, String userId) async {
     try {
       isLoading.value = true;
-      if (groupId.isEmpty || userId.isEmpty) throw Exception("Invalid group or user ID");
+      if (groupId.isEmpty || userId.isEmpty)
+        throw Exception("Invalid group or user ID");
       await remoteDataSource.removeMember(groupId, userId);
       members.removeWhere((m) => m.userId == userId);
       _showSuccessSnackbar("Member removed successfully");
@@ -573,19 +350,90 @@ class GroupsController extends GetxController {
     }
   }
 
-  Future<void> updateMemberStatus(String groupId, String userId, String status) async {
+  Future<void> addSelectedMembers(
+    List<Map<String, dynamic>> selectedUsers,
+  ) async {
+    try {
+      final currentGroupId = groupId.value;
+      if (currentGroupId.isEmpty) {
+        _showErrorSnackbar("Error", "Group not found");
+        return;
+      }
+      isLoading.value = true;
+      await loadMembers(currentGroupId);
+      int addedCount = 0;
+      int skippedCount = 0;
+      for (final user in selectedUsers) {
+        final uid = user['uid']?.toString().trim() ?? '';
+        final name = user['name']?.toString().trim() ?? 'Unknown';
+        final phone = _normalizePhone(user['phone']?.toString() ?? '');
+        final email = user['email']?.toString().trim().toLowerCase() ?? '';
+        final alreadyExists = members.any((m) {
+          final memberId = m.userId.toString().trim();
+          final memberName = m.name.toString().trim();
+          final memberPhone = _normalizePhone(m.userId);
+          final memberEmail = m.userId.toString().trim().toLowerCase();
+          return (uid.isNotEmpty && memberId == uid) ||
+              (phone.isNotEmpty && memberPhone == phone) ||
+              (email.isNotEmpty && memberEmail == email) ||
+              memberName == name;
+        });
+        if (alreadyExists) {
+          skippedCount++;
+          continue;
+        }
+        final newMember = MemberEntity(
+          groupId: currentGroupId,
+          userId: uid.isNotEmpty ? uid : phone,
+          name: name,
+          role: 'member',
+          invitationStatus: 'accepted',
+          joinedAt: DateTime.now(),
+          invitedBy: currentUserId,
+          isAppUser: user['isAppUser'] ?? false,
+          firestoreId: '',
+        );
+        await addMemberUseCase.call(currentGroupId, newMember);
+        addedCount++;
+      }
+      await loadMembers(currentGroupId);
+      Get.back();
+      _showSuccessSnackbar(
+        "$addedCount added, $skippedCount duplicate skipped",
+      );
+    } catch (e) {
+      _showErrorSnackbar("Error", e.toString());
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  String _normalizePhone(dynamic value) {
+    String phone = value.toString();
+    phone = phone.replaceAll(" ", "");
+    phone = phone.replaceAll("-", "");
+    phone = phone.replaceAll("(", "");
+    phone = phone.replaceAll(")", "");
+    if (phone.startsWith("+93")) {
+      phone = "0${phone.substring(3)}";
+    }
+    return phone.trim();
+  }
+
+  Future<void> updateMemberStatus(
+    String groupId,
+    String userId,
+    String status,
+  ) async {
     try {
       isLoading.value = true;
       if (groupId.isEmpty || userId.isEmpty || status.isEmpty) {
         throw Exception("Invalid parameters");
       }
-      final memberIndex = members.indexWhere((m) => m.userId == userId && m.groupId == groupId);
+      final memberIndex = members.indexWhere(
+        (m) => m.userId == userId && m.groupId == groupId,
+      );
       if (memberIndex == -1) throw Exception("Member not found");
-
-      // Update in remote
-      // final updatedDoc = await updateMemberStatusUseCase.call(groupId, userId, status);
-
-      // Refresh member from remote to get correct firestoreId
       final member = members[memberIndex];
       final updatedMember = MemberEntity(
         groupId: member.groupId,
@@ -608,7 +456,10 @@ class GroupsController extends GetxController {
     }
   }
 
-  Future<void> acceptGroupInvitation({required String groupId, required String userId}) async {
+  Future<void> acceptGroupInvitation({
+    required String groupId,
+    required String userId,
+  }) async {
     try {
       await updateMemberStatus(groupId, userId, 'accepted');
     } catch (e) {
@@ -619,6 +470,7 @@ class GroupsController extends GetxController {
   // ------------------------------------------------------------
   // USER SEARCH
   // ------------------------------------------------------------
+
   void onSearchChanged(String query) {
     _debounce?.cancel();
     if (query.isEmpty) {
@@ -658,7 +510,9 @@ class GroupsController extends GetxController {
 
   Future<void> fetchPhoneContacts() async {
     try {
-      final status = await FlutterContacts.permissions.request(PermissionType.readWrite);
+      final status = await FlutterContacts.permissions.request(
+        PermissionType.readWrite,
+      );
       if (status != PermissionStatus.granted) {
         _showErrorSnackbar("Permission denied", "Cannot access contacts");
         return;
@@ -674,21 +528,22 @@ class GroupsController extends GetxController {
   // ------------------------------------------------------------
   // NEW METHODS FOR GroupDetailScreen
   // ------------------------------------------------------------
-  Future<void> loadGroupAndMembers(String groupId) async {
-    // Find group from allGroups or fetch
-    final group = allGroups.firstWhereOrNull((g) => g.id == groupId);
-    if (group != null) {
-      currentGroup.value = group;
-    } else {
-      // Optionally fetch single group if needed
+
+  Future<void> loadGroupAndMembers(
+    String groupId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!_isOnline.value && !forceRefresh) {
+      _showErrorSnackbar("Offline", "Cannot refresh. Connect to internet.");
+      return;
     }
+    final group = allGroups.firstWhereOrNull((g) => g.id == groupId);
+    if (group != null) currentGroup.value = group;
     await loadMembers(groupId);
-    balanceText.value = '0.0';
+    watchGroupBalance(groupId);
   }
 
   void showEditGroupNameDialog(BuildContext context, GroupEntity group) {
-    // Implement dialog logic (keep UI as per Figma)
-    // Example: show dialog with TextField and update on confirm
     final controller = TextEditingController(text: group.name);
     Get.defaultDialog(
       title: "Edit Group Name",
@@ -714,55 +569,178 @@ class GroupsController extends GetxController {
     );
   }
 
+  // ------------------------------------------------------------
+  // DELETE GROUP DIALOG - FULLY FIXED
+  // ------------------------------------------------------------
   void showDeleteGroupDialog(BuildContext context, String groupId) {
-    Get.defaultDialog(
-      title: "Delete Group",
-      middleText: "Are you sure you want to delete this group?",
-      confirm: ElevatedButton(
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-        onPressed: () async {
-          await deleteSelectedGroup(groupId);
-          Get.back();
-          Get.offAll(() => const HomeScreen());
-          final homeController = Get.find<HomeController>();
-          homeController.changeTab(1);
-        },
-        child: const Text("Delete"),
-      ),
-      cancel: TextButton(
-        onPressed: () => Get.back(),
-        child: const Text("Cancel"),
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delete Group"),
+        content: const Text(
+          "Are you sure you want to delete this group? This action cannot be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await Future.delayed(
+                Duration.zero,
+              ); // یا await WidgetsBinding.instance.endOfFrame
+              await deleteSelectedGroup(groupId);
+            },
+            child: const Text("Delete"),
+          ),
+        ],
       ),
     );
   }
 
-  void showPickerMenu(BuildContext context, GroupEntity group) {
-    // Placeholder for image picker logic
-    // Implement using ImagePicker and update groupImageFile
-  }
-
-  void showRemoveMemberDialog(BuildContext context, String groupId, MemberEntity member) {
-    Get.defaultDialog(
-      title: "Remove Member",
-      middleText: "Remove ${member.name} from the group?",
-      confirm: ElevatedButton(
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-        onPressed: () async {
-          await removeMemberFromGroup(groupId, member.userId);
-          Get.back();
-        },
-        child: const Text("Remove"),
-      ),
-      cancel: TextButton(
-        onPressed: () => Get.back(),
-        child: const Text("Cancel"),
+  // ------------------------------------------------------------
+  // REMOVE MEMBER DIALOG - FULLY FIXED
+  // ------------------------------------------------------------
+  void showRemoveMemberDialog(
+    BuildContext context,
+    String groupId,
+    MemberEntity member,
+  ) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Remove Member"),
+        content: Text("Remove ${member.name} from the group?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await Future.delayed(Duration.zero);
+              await removeMemberFromGroup(groupId, member.userId);
+            },
+            child: const Text("Remove"),
+          ),
+        ],
       ),
     );
+  }
+
+  void watchGroupBalance(String groupId) {
+    _expenseSubscription?.cancel();
+    _expenseSubscription = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(groupId)
+        .collection('expenses')
+        .snapshots()
+        .listen((snapshot) {
+          double total = 0;
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            total += (data['amount'] ?? 0).toDouble();
+          }
+          balanceText.value = total.toStringAsFixed(0);
+        });
   }
 
   void goToAddMembers() {
-    // Navigate to add members screen (keep UI unchanged)
-    Get.toNamed('/add-members', arguments: currentGroup.value?.id);
+    final groupId = currentGroup.value?.id;
+    if (groupId == null || groupId.isEmpty) {
+      _showErrorSnackbar("Error", "Group ID is null");
+      return;
+    }
+    debugPrint("🚀 Navigating to SelectMembersScreen with groupId: $groupId");
+    Get.toNamed('/select-members', arguments: {'groupId': groupId});
+  }
+
+  // FIXED: Upload image and update currentGroup & allGroups
+  Future<String?> uploadGroupImage(File imageFile, String groupId) async {
+    try {
+      if (!_isOnline.value) throw Exception("No internet connection");
+      final ref = FirebaseStorage.instance.ref().child(
+        'group_images/$groupId.jpg',
+      );
+      await ref.putFile(imageFile);
+      final url = await ref.getDownloadURL();
+      await remoteDataSource.updateGroupCover(groupId, url);
+
+      // Update currentGroup if it belongs to this group
+      if (currentGroup.value?.id == groupId) {
+        final updatedGroup = (currentGroup.value as GroupModel).copyWith(
+          coverImageUrl: url,
+        );
+        currentGroup.value = updatedGroup;
+        // Also update in allGroups
+        final index = allGroups.indexWhere((g) => g.id == groupId);
+        if (index != -1) {
+          allGroups[index] = updatedGroup as GroupModel;
+        }
+        final groupIndex = groups.indexWhere((g) => g.id == groupId);
+        if (groupIndex != -1) {
+          groups[groupIndex] = updatedGroup;
+        }
+      }
+      return url;
+    } catch (e) {
+      print("Upload error: $e");
+      _showErrorSnackbar("Upload Failed", e.toString());
+      return null;
+    }
+  }
+
+  void showPickerMenu(BuildContext context, GroupEntity group) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text("Take Photo"),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final picker = ImagePicker();
+                final picked = await picker.pickImage(
+                  source: ImageSource.camera,
+                );
+                if (picked != null) {
+                  groupImageFile.value = File(picked.path);
+                  await uploadGroupImage(File(picked.path), group.id);
+                  groupImageFile.value = null; // clear temporary file
+                  await loadGroupAndMembers(group.id, forceRefresh: true);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text("Choose from Gallery"),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final picker = ImagePicker();
+                final picked = await picker.pickImage(
+                  source: ImageSource.gallery,
+                );
+                if (picked != null) {
+                  groupImageFile.value = File(picked.path);
+                  await uploadGroupImage(File(picked.path), group.id);
+                  groupImageFile.value = null;
+                  await loadGroupAndMembers(group.id, forceRefresh: true);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ------------------------------------------------------------
@@ -770,19 +748,25 @@ class GroupsController extends GetxController {
   // ------------------------------------------------------------
   void _showSuccessSnackbar(String message) {
     if (_isDisposed) return;
-    Get.snackbar('Success', message,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2));
+    Get.snackbar(
+      'Success',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+    );
   }
 
   void _showErrorSnackbar(String title, String message) {
     if (_isDisposed) return;
-    Get.snackbar(title, message,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3));
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 3),
+    );
   }
 }

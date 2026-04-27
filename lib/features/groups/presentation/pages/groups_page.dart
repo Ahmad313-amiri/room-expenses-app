@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:roomly/features/groups/presentation/pages/groups_details_page.dart';
@@ -9,20 +7,19 @@ import '../binding/group_binding.dart';
 import '../controller/group_controller.dart';
 class GroupsPage extends StatelessWidget {
   const GroupsPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     if (!Get.isRegistered<GroupsController>()) {
       GroupBinding().dependencies();
     }
     final controller = Get.find<GroupsController>();
+
     return Scaffold(
       backgroundColor: Colors.grey.shade200,
       appBar: AppBar(
         centerTitle: true,
-        title: const Text(
-          'My Groups',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('My Groups', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline, size: 28),
@@ -37,23 +34,25 @@ class GroupsPage extends StatelessWidget {
         children: [
           _buildSearchBar(controller),
           Expanded(
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (controller.groups.isEmpty) {
-                return GroupsNotFound();
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: controller.groups.length,
-                itemBuilder: (context, index) {
-                  final group = controller.groups[index];
-                  return _buildGroupCard(group);
-                },
-              );
-            }),
+            child: RefreshIndicator(
+              onRefresh: () => controller.refreshGroups(),
+              child: Obx(() {
+                if (controller.isLoading.value && controller.groups.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (controller.groups.isEmpty) {
+                  return const GroupsNotFound();
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: controller.groups.length,
+                  itemBuilder: (context, index) {
+                    final group = controller.groups[index];
+                    return _buildGroupCard(group);
+                  },
+                );
+              }),
+            ),
           ),
         ],
       ),

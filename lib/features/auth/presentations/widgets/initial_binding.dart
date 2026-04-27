@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../../../settings/settings_controller.dart';
+import '../../../../settings/theme_controller.dart';
 import '../../../expenses/data/datasources/expense_remote_datasource.dart';
 import '../../../expenses/data/repository/expense_repository_impl.dart';
 import '../../../expenses/domain/repository/expense_repository.dart';
@@ -20,7 +22,6 @@ import '../../../groups/domain/usecases/get_groups.dart';
 import '../../../groups/domain/usecases/get_members.dart';
 import '../../../groups/domain/usecases/search_users_usecase.dart';
 import '../../../groups/domain/usecases/update_member_status.dart';
-import '../../../groups/presentation/controller/expense_controller.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
 import '../../data/repository/authentication_repository.dart';
 
@@ -78,6 +79,11 @@ class AppBinding extends Bindings {
           () => ExpenseRepositoryImpl(Get.find()),
       fenix: true,
     );
+
+
+
+    Get.put(SettingsController(), permanent: true);
+    Get.put(ThemeController(), permanent: true);
 
     // ================= EXPENSE USE CASES =================
     Get.lazyPut(() => AddExpenseUseCase(Get.find()), fenix: true);

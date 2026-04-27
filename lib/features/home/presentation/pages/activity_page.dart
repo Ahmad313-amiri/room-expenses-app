@@ -1,377 +1,644 @@
+// lib/features/activity/presentation/screens/activity_screen.dart
+
 import 'package:flutter/material.dart';
-import '../../../groups/presentation/pages/settlement_verification_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:get/get.dart';
+
+import '../../../groups/presentation/controller/group_controller.dart';
 
 class ActivityScreen extends StatefulWidget {
-  const ActivityScreen({super.key});
+  final String? groupId;
+
+  const ActivityScreen({
+    Key? key,
+    this.groupId,
+  }) : super(key: key);
 
   @override
   State<ActivityScreen> createState() => _ActivityScreenState();
 }
 
-class _ActivityScreenState extends State<ActivityScreen> {
-  bool isLoading = true;
+class _ActivityScreenState extends State<ActivityScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  final GroupsController groupsController = Get.find<GroupsController>();
+
+  String? groupId;
+
+  bool _expenseLoading = true;
+  bool _settlementLoading = true;
+
+  String _expenseError = '';
+  String _settlementError = '';
+
+  final List<ExpenseWithDebts> _expenses = [];
+  final List<Map<String, dynamic>> _settlements = [];
+
+  final Map<String, Map<String, String>> _memberNamesByGroup = {};
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+
+    groupId = widget.groupId;
+    _tabController = TabController(length: 2, vsync: this);
+
+    _loadInitialData();
   }
 
-  Future<void> _loadData() async {
-
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-
-    setState(() {
-      isLoading = false;
-    });
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
-  Future<void> _onRefresh() async {
-    if (!mounted) return;
-    setState(() => isLoading = true);
+  // ---------------- INITIAL LOAD ----------------
 
-    await Future.delayed(const Duration(seconds: 2));
+  Future<void> _loadInitialData() async {
+    await _loadMembers();
 
-    if (!mounted) return;
-    setState(() => isLoading = false);
+    _loadExpenses();
+    _loadSettlements();
   }
 
-  // All activities tab content
-  Widget _buildAllActivityList() {
-    // نمایش لودینگ در صورتی که isLoading true باشد
-    if (isLoading) {
+  // ---------------- MEMBERS ----------------
+
+  Future<void> _loadMembers() async {
+    _memberNamesByGroup.clear();
+
+    if (groupId != null && groupId!.isNotEmpty) {
+      await _fetchMembers(groupId!, storeUnder: groupId!);
+      return;
+    }
+
+    final groups = groupsController.groups;
+
+    await Future.wait(
+      groups.map(
+            (group) => _fetchMembers(group.id, storeUnder: group.id),
+      ),
+    );
+  }
+
+  Future<void> _fetchMembers(
+      String grpId, {
+        required String storeUnder,
+      }) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(grpId)
+        .collection('members')
+        .get(const GetOptions(source: Source.serverAndCache));
+
+    _memberNamesByGroup[storeUnder] = {
+      for (final doc in snapshot.docs)
+        doc.id: (doc.data()['name'] ?? 'Unknown').toString(),
+    };
+  }
+
+  // ---------------- EXPENSES ----------------
+
+  Future<void> _loadExpenses() async {
+    if (mounted) {
+      setState(() {
+        _expenseLoading = true;
+        _expenseError = '';
+        _expenses.clear();
+      });
+    }
+
+    try {
+      final List<ExpenseWithDebts> temp = [];
+
+      if (groupId != null && groupId!.isNotEmpty) {
+        await _fetchExpenses(
+          grpId: groupId!,
+          storeUnder: groupId!,
+          target: temp,
+        );
+      } else {
+        final groups = groupsController.groups;
+
+        await Future.wait(
+          groups.map(
+                (group) => _fetchExpenses(
+              grpId: group.id,
+              storeUnder: group.id,
+              target: temp,
+            ),
+          ),
+        );
+      }
+
+      temp.sort((a, b) => b.date.compareTo(a.date));
+
+      if (!mounted) return;
+
+      setState(() {
+        _expenses.addAll(temp);
+        _expenseLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _expenseLoading = false;
+        _expenseError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _fetchExpenses({
+    required String grpId,
+    required String storeUnder,
+    required List<ExpenseWithDebts> target,
+  }) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(grpId)
+        .collection('expenses')
+        .orderBy('date', descending: true)
+        .limit(30)
+        .get(const GetOptions(source: Source.serverAndCache));
+
+    final names = _memberNamesByGroup[storeUnder] ?? {};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      final paidBy = Map<String, dynamic>.from(data['paidBy'] ?? {});
+      final split = Map<String, dynamic>.from(data['split'] ?? {});
+
+      final payerId = paidBy.isNotEmpty ? paidBy.keys.first : '';
+
+      final List<Debt> debts = [];
+
+      split.forEach((userId, amount) {
+        if (userId != payerId) {
+          debts.add(
+            Debt(
+              debtorId: userId,
+              amount: (amount as num).toDouble(),
+            ),
+          );
+        }
+      });
+
+      target.add(
+        ExpenseWithDebts(
+          id: doc.id,
+          groupId: grpId,
+          description: (data['description'] ?? '').toString(),
+          amount: ((data['amount'] ?? 0) as num).toDouble(),
+          date:
+          (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          payerId: payerId,
+          debts: debts,
+          memberNames: names,
+        ),
+      );
+    }
+  }
+
+  // ---------------- SETTLEMENTS ----------------
+
+  Future<void> _loadSettlements() async {
+    if (mounted) {
+      setState(() {
+        _settlementLoading = true;
+        _settlementError = '';
+        _settlements.clear();
+      });
+    }
+
+    try {
+      final List<Map<String, dynamic>> temp = [];
+
+      if (groupId != null && groupId!.isNotEmpty) {
+        await _fetchSettlements(
+          grpId: groupId!,
+          storeUnder: groupId!,
+          target: temp,
+        );
+      } else {
+        final groups = groupsController.groups;
+
+        await Future.wait(
+          groups.map(
+                (group) => _fetchSettlements(
+              grpId: group.id,
+              storeUnder: group.id,
+              target: temp,
+            ),
+          ),
+        );
+      }
+
+      temp.sort(
+            (a, b) =>
+            (b['date'] as DateTime).compareTo(a['date'] as DateTime),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _settlements.addAll(temp);
+        _settlementLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _settlementLoading = false;
+        _settlementError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _fetchSettlements({
+    required String grpId,
+    required String storeUnder,
+    required List<Map<String, dynamic>> target,
+  }) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(grpId)
+        .collection('settlements')
+        .orderBy('date', descending: true)
+        .limit(30)
+        .get(const GetOptions(source: Source.serverAndCache));
+
+    final names = _memberNamesByGroup[storeUnder] ?? {};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      target.add({
+        'id': doc.id,
+        'groupId': grpId,
+        'from': data['from'],
+        'to': data['to'],
+        'amount': ((data['amount'] ?? 0) as num).toDouble(),
+        'date':
+        (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        'paymentMethod': data['paymentMethod'] ?? '',
+        'memberNames': names,
+      });
+    }
+  }
+
+  // ---------------- REFRESH ----------------
+
+  Future<void> _refreshExpenses() async {
+    await _loadExpenses();
+  }
+
+  Future<void> _refreshSettlements() async {
+    await _loadSettlements();
+  }
+
+  // ---------------- UI ----------------
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9F9F9),
+      appBar: AppBar(
+        title: const Text(
+          'Activities',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: const Color(0xFF2ECC71),
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: const Color(0xFF2ECC71),
+          tabs: const [
+            Tab(text: 'Expenses'),
+            Tab(text: 'Settlements'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _expensesTab(),
+          _settlementsTab(),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- EXPENSE TAB ----------------
+
+  Widget _expensesTab() {
+    if (_expenseLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2ECC71)),
+        child: CircularProgressIndicator(
+          color: Color(0xFF2ECC71),
+        ),
+      );
+    }
+
+    if (_expenseError.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _expenseError,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red),
+            ),
+            ElevatedButton(
+              onPressed: _refreshExpenses,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_expenses.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _refreshExpenses,
+        child: ListView(
+          children: const [
+            SizedBox(height: 180),
+            Icon(
+              Icons.receipt_long,
+              size: 80,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Center(
+              child: Text(
+                'No expenses found.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
     return RefreshIndicator(
-      color: const Color(0xFF2ECC71),
-      onRefresh: _onRefresh,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const Text(
-            'Today',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      onRefresh: _refreshExpenses,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _expenses.length,
+        itemBuilder: (_, index) {
+          return _buildExpenseCard(_expenses[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildExpenseCard(ExpenseWithDebts expense) {
+    final payerName =
+        expense.memberNames[expense.payerId] ?? 'Unknown';
+
+    final date =
+    DateFormat('yyyy/MM/dd – HH:mm').format(expense.date);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.blue.shade100,
+          child: const Icon(
+            Icons.receipt,
+            color: Colors.blue,
           ),
-          const SizedBox(height: 16),
-
-          _buildSettlementRequestCard(
-            context: context,
-            title: 'Settlement Request: \$45.00',
-            subtitle: 'James wants to settle for \'Beach Trip\'',
-            image:
-            'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400',
-            isActive: true,
+        ),
+        title: Text(
+          expense.description,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
           ),
-
-          _buildActivityTile(
-            name: 'Sarah',
-            action: 'added \'Grocery...\'',
-            details: 'Total: \$124.50 • Your share: \$12.50',
-            time: '2h ago',
-            avatar: 'https://i.pravatar.cc/150?u=sarah',
-            hasUnreadDot: true,
+        ),
+        subtitle: Text(
+          'Paid by $payerName • $date',
+        ),
+        trailing: Text(
+          '\$${expense.amount.toStringAsFixed(2)}',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2ECC71),
           ),
-
-          const SizedBox(height: 24),
-
-          const Text(
-            'Yesterday',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        children: expense.debts.isEmpty
+            ? const [
+          Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('No debts (single payer)'),
           ),
-          const SizedBox(height: 16),
+        ]
+            : [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: expense.debts.map((debt) {
+                final debtor =
+                    expense.memberNames[debt.debtorId] ??
+                        'Unknown';
 
-          _buildVerifiedTile(
-            title: 'Settlement Verified',
-            desc: 'You confirmed Mike\'s \$20.00 payment',
-          ),
-
-          _buildActivityTile(
-            name: 'Mark',
-            action: 'added \'Fuel for...\'',
-            details: 'Your share: \$18.75',
-            time: 'Yesterday',
-            avatar: 'https://i.pravatar.cc/150?u=mark',
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(
+                    Icons.person_outline,
+                    size: 20,
+                  ),
+                  title: Text(debtor),
+                  trailing: Text(
+                    '\$${debt.amount.toStringAsFixed(2)} owes $payerName',
+                  ),
+                );
+              }).toList(),
+            ),
           ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF9F9F9),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: const Icon(
-            Icons.arrow_back_ios,
-            color: Colors.black,
-            size: 20,
-          ),
-          title: const Text(
-            'Activity',
-            style: TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+  // ---------------- SETTLEMENT TAB ----------------
+
+  Widget _settlementsTab() {
+    if (_settlementLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF2ECC71),
+        ),
+      );
+    }
+
+    if (_settlementError.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _settlementError,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red),
             ),
-          ),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.more_horiz, color: Colors.black),
-              onPressed: () {},
+            ElevatedButton(
+              onPressed: _refreshSettlements,
+              child: const Text('Retry'),
             ),
           ],
-          bottom: const TabBar(
-            labelColor: Color(0xFF2ECC71),
-            unselectedLabelColor: Colors.grey,
-            indicatorColor: Color(0xFF2ECC71),
-            indicatorWeight: 3,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold),
-            tabs: [
-              Tab(text: 'All'),
-              Tab(text: 'Expenses'),
-              Tab(text: 'Settlements'),
-            ],
+        ),
+      );
+    }
+
+    if (_settlements.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _refreshSettlements,
+        child: ListView(
+          children: const [
+            SizedBox(height: 180),
+            Icon(
+              Icons.account_balance_wallet,
+              size: 80,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Center(
+              child: Text(
+                'No settlements found.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshSettlements,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _settlements.length,
+        itemBuilder: (_, index) {
+          return _buildSettlementCard(_settlements[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSettlementCard(
+      Map<String, dynamic> settlement,
+      ) {
+    final names =
+    settlement['memberNames'] as Map<String, String>;
+
+    final fromName =
+        names[settlement['from']] ?? 'Unknown';
+
+    final toName =
+        names[settlement['to']] ?? 'Unknown';
+
+    final amount = settlement['amount'];
+
+    final date = settlement['date'] as DateTime;
+
+    final method = settlement['paymentMethod'];
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.green.shade100,
+          child: const Icon(
+            Icons.swap_horiz,
+            color: Colors.green,
           ),
         ),
-        body: TabBarView(
+        title: Text(
+          '$fromName → $toName',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
           children: [
-            _buildAllActivityList(),
-            const Center(child: Text('Expenses List')),
-            const Center(child: Text('Settlements List')),
+            Text(
+              DateFormat('yyyy/MM/dd – HH:mm')
+                  .format(date),
+            ),
+            if (method.toString().isNotEmpty)
+              Text(
+                'Method: $method',
+                style: const TextStyle(
+                  fontSize: 12,
+                ),
+              ),
           ],
+        ),
+        trailing: Text(
+          NumberFormat.currency(
+            symbol: '',
+            decimalDigits: 0,
+          ).format(amount),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2ECC71),
+          ),
         ),
       ),
     );
   }
 }
 
-// همان متدهای کمکی UI شما بدون تغییر
-Widget _buildSettlementRequestCard({
-  required BuildContext context,
-  required String title,
-  required String subtitle,
-  required String image,
-  required bool isActive,
-}) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 16),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10),
-      ],
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (isActive)
-          Container(
-            width: 4,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFF2ECC71),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (isActive)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 6),
-                      child: CircleAvatar(
-                        radius: 4,
-                        backgroundColor: Color(0xFF2ECC71),
-                      ),
-                    ),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(color: Colors.grey, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              isActive
-                  ? ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_)=>SettlementVerificationScreen()));
-                },
-                icon: const Icon(Icons.check_circle, size: 18),
-                label: const Text('Verify Now'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2ECC71),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-              )
-                  : Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Verified',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(
-                      Icons.check_circle,
-                      size: 14,
-                      color: Colors.grey,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(image, width: 80, height: 80, fit: BoxFit.cover),
-        ),
-      ],
-    ),
-  );
+// ---------------- MODELS ----------------
+
+class ExpenseWithDebts {
+  final String id;
+  final String groupId;
+  final String description;
+  final double amount;
+  final DateTime date;
+  final String payerId;
+  final List<Debt> debts;
+  final Map<String, String> memberNames;
+
+  ExpenseWithDebts({
+    required this.id,
+    required this.groupId,
+    required this.description,
+    required this.amount,
+    required this.date,
+    required this.payerId,
+    required this.debts,
+    required this.memberNames,
+  });
 }
 
-Widget _buildActivityTile({
-  required String name,
-  required String action,
-  required String details,
-  required String time,
-  required String avatar,
-  bool hasUnreadDot = false,
-}) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    child: Row(
-      children: [
-        CircleAvatar(backgroundImage: NetworkImage(avatar), radius: 24),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              RichText(
-                text: TextSpan(
-                  style: const TextStyle(color: Colors.black, fontSize: 14),
-                  children: [
-                    TextSpan(
-                      text: '$name ',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    TextSpan(text: action),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                details,
-                style: const TextStyle(
-                  color: Color(0xFF2ECC71),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              time,
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
-            ),
-            if (hasUnreadDot)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: CircleAvatar(
-                  radius: 4,
-                  backgroundColor: Color(0xFF2ECC71),
-                ),
-              ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
+class Debt {
+  final String debtorId;
+  final double amount;
 
-Widget _buildVerifiedTile({required String title, required String desc}) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    child: Row(
-      children: [
-        const CircleAvatar(
-          backgroundColor: Color(0xFFE8F8EF),
-          child: Icon(Icons.handshake, color: Color(0xFF2ECC71), size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              Text(
-                desc,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-        const Text(
-          'Yesterday',
-          style: TextStyle(color: Colors.grey, fontSize: 11),
-        ),
-      ],
-    ),
-  );
+  Debt({
+    required this.debtorId,
+    required this.amount,
+  });
 }

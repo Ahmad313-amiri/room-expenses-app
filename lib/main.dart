@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:roomly/firebase_api.dart';
 import 'features/auth/data/repository/auth_gate.dart';
 import 'features/groups/presentation/binding/expense_binding.dart';
 import 'features/groups/presentation/binding/group_binding.dart';
@@ -21,7 +23,8 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
+await FirebaseApi().initNotifications();
+  await GetStorage.init();
   runApp(const SplitEaseApp());
 }
 
@@ -36,7 +39,10 @@ class SplitEaseApp extends StatelessWidget {
       initialBinding: AppBinding(),
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       home: const AuthGate(),
-      getPages: [
+      getPages: [GetPage(
+        name: '/select-members',
+        page: () => SelectMembersScreen(),
+      ),
         GetPage(name: '/authEntry', page: () => const AuthEntryScreen()),
         GetPage(name: '/select_members', page: () => const SelectMembersScreen()),
 
@@ -73,7 +79,9 @@ class SplitEaseApp extends StatelessWidget {
               groupId: args['groupId'],
               members: args['members'],
             );
+
           },
+
           binding:AppBinding(),
         ),
       ],

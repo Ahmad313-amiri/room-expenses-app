@@ -1,11 +1,14 @@
 // lib/features/expenses/presentation/controllers/group_expense_split_controller.dart
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../expenses/domain/entities/expense.dart';
-import '../../../expenses/domain/usecases/create_expense_usecase.dart';
-import '../../domain/entities/member_entity.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../groups/domain/entities/member_entity.dart';
+import '../../../home/presentation/pages/activity_page.dart';
+import '../../domain/entities/expense.dart';
+import '../../domain/usecases/create_expense_usecase.dart';
 
 
 class GroupExpenseSplitController extends GetxController {
@@ -90,11 +93,16 @@ class GroupExpenseSplitController extends GetxController {
   }
 
   Future<void> saveExpense() async {
+    print("GROUP ID = $groupId");
     if (!isSplitValid) {
       Get.snackbar('Error', 'Total shares do not match the total amount');
       return;
     }
 
+    if (groupId.isEmpty) {
+      Get.snackbar("Error", "Group ID missing");
+      return;
+    }
     if (descriptionController.text.trim().isEmpty) {
       Get.snackbar('Error', 'Please enter a description');
       return;
@@ -108,8 +116,11 @@ class GroupExpenseSplitController extends GetxController {
       selectedPayerId.value: amount,
     };
     print("🔥 CREATE EXPENSE CALLED");
-    final expenseId =
-        FirebaseFirestore.instance.collection('tmp').doc().id;
+    final expenseId = FirebaseFirestore.instance.collection('groups')
+        .doc(groupId)
+        .collection('expenses')
+        .doc()
+        .id;
 
     final expense = Expense(
       id: expenseId,
@@ -123,9 +134,32 @@ class GroupExpenseSplitController extends GetxController {
       split: shares,
     );
 
-    await addExpenseUseCase(expense);
+    try {
+      await addExpenseUseCase(expense);
 
-    Get.back();
+      print("✅ EXPENSE SAVED SUCCESSFULLY");
+
+      Get.offAll(() => ActivityScreen());
+
+      Future.delayed(const Duration(milliseconds: 200), () {
+        Get.snackbar(
+          'Success',
+          'Expense saved successfully',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      });
+
+    } catch (e) {
+    Get.snackbar(
+    'Error',
+    'Failed to save expense: $e',
+    backgroundColor: Colors.red,
+    colorText: Colors.white,
+    );
+    }
+    // Get.back();
   }
 
   @override

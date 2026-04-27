@@ -47,11 +47,12 @@ class GroupRemoteDataSource {
         .collection('groups')
         .doc(groupId)
         .collection('members')
-        .doc();
+        .doc(member.userId);
     final memberWithId = member.copyWith(
       firestoreId: docRef.id,
     );
     await docRef.set(memberWithId.toMap());
+    await refreshMembersCount(groupId);
   }
 
   Future<List<MemberModel>> getMembers(String groupId) async {
@@ -79,6 +80,8 @@ class GroupRemoteDataSource {
         .collection('members')
         .doc(memberId)
         .delete();
+    await refreshMembersCount(groupId);
+
   }
 
   Future<void> updateMemberStatus(String groupId, String memberId, String status) async {
@@ -89,6 +92,14 @@ class GroupRemoteDataSource {
         .doc(memberId)
         .update({'invitationStatus': status});
   }
+
+
+  Future<void> updateGroupCover(String groupId, String imageUrl) async {
+    await firestore.collection('groups').doc(groupId).update({
+      'coverImageUrl': imageUrl,
+    });
+  }
+
 
   // ========== User Search Methods ==========
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
@@ -119,6 +130,7 @@ class GroupRemoteDataSource {
         .limit(1)
         .get();
 
+
     if (snapshot.docs.isEmpty) return null;
     final doc = snapshot.docs.first;
     return {
@@ -126,5 +138,18 @@ class GroupRemoteDataSource {
       'name': doc.data()['name'] ?? '',
       'email': doc.data()['email'] ?? '',
     };
+  }
+  Future<void> refreshMembersCount(String groupId) async {
+    final snapshot = await firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('members')
+        .get();
+
+    print("🔥 REAL MEMBERS COUNT: ${snapshot.docs.length}");
+
+    await firestore.collection('groups').doc(groupId).update({
+      'membersCount': snapshot.docs.length,
+    });
   }
 }

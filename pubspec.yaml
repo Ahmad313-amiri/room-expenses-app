@@ -44,6 +44,12 @@ dependencies:
   bugsnag_flutter: ^4.2.0
   firebase_storage:
   flutter_contacts: ^2.0.0
+  firebase_messaging: ^16.2.0
+  rxdart: ^0.28.0
+  connectivity_plus: ^7.1.1
+  cached_network_image: ^3.4.1
+  package_info_plus: ^8.0.2
+  get_storage: ^2.1.1
 
 dev_dependencies:
   flutter_test:

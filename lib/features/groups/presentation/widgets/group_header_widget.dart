@@ -1,13 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../domain/entities/group.dart';
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../groups/domain/entities/group.dart';
 
 class GroupHeaderWidget extends StatelessWidget {
   final GroupEntity group;
   final VoidCallback onEditImage;
   final File? imageFile;
   final bool isLoadingImage;
-  static const String _defaultImageUrl = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400';
 
   const GroupHeaderWidget({
     super.key,
@@ -20,42 +20,49 @@ class GroupHeaderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
-              image: DecorationImage(
-                image: imageFile != null
-                    ? FileImage(imageFile!)
-                    : (group.coverImageUrl?.isNotEmpty ?? false)
-                    ? NetworkImage(group.coverImageUrl!)
-                    : const NetworkImage(_defaultImageUrl),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: isLoadingImage ?
-            const Center(child: CircularProgressIndicator()) : null,
-          ),
-          GestureDetector(
-            onTap: onEditImage,
-            child: Container(
-              padding: const EdgeInsets.all(8),
+      child: GestureDetector(
+        onTap: onEditImage,
+        child: Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: Colors.blue,
                 shape: BoxShape.circle,
+                color: Colors.grey.shade200,
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: const Icon(Icons.edit, color: Colors.white, size: 18),
+              child: ClipOval(
+                child: _buildImageContent(),
+              ),
             ),
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
+              child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildImageContent() {
+    if (isLoadingImage) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (imageFile != null) {
+      return Image.file(imageFile!, fit: BoxFit.cover);
+    }
+    if (group.coverImageUrl != null && group.coverImageUrl!.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: group.coverImageUrl!,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+        errorWidget: (_, __, ___) => const Icon(Icons.group, size: 50, color: Colors.blue),
+      );
+    }
+    return const Icon(Icons.group, size: 50, color: Colors.blue);
   }
 }

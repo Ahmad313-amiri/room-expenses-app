@@ -152,44 +152,51 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
   Future<void> _createGroup() async {
     final groupName = _nameController.text.trim();
     if (groupName.isEmpty) {
-      Get.snackbar("Error", "Please enter a group name",
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Error',
+        'Please enter a group name',
+        snackPosition: SnackPosition.BOTTOM,
+      );
       return;
     }
 
     final authRepo = Get.find<AuthenticationRepository>();
     final firebaseUser = authRepo.firebaseUser.value;
     if (firebaseUser == null) {
-      Get.snackbar("Error", "User not authenticated");
+      Get.snackbar('Error', 'User not authenticated');
       return;
     }
 
-    final uid = firebaseUser.uid ;
-    final userName = firebaseUser.displayName ?? "You";
+    final uid = firebaseUser.uid;
+    final userName = firebaseUser.displayName ?? 'You';
 
     setState(() => _isCreating = true);
 
     try {
-      // When creating a new group, always add the creator as 'admin' if not present.
+      // Ensure the creator is added as admin if not already in the list
       if (!members.any((m) => m.userId == uid)) {
-        members.insert(0, MemberModel(
-          name: userName,
-          userId: uid,
-          firestoreId: '',
-          groupId: '',
-          role: 'admin',
-          joinedAt: DateTime.now(),
-          invitationStatus: 'accepted',
-          isAppUser: true,
-        ));
+        members.insert(
+          0,
+          MemberModel(
+            name: userName,
+            userId: uid,
+            firestoreId: '',
+            groupId: '',
+            role: 'admin',
+            joinedAt: DateTime.now(),
+            invitationStatus: 'accepted',
+            isAppUser: true,
+          ),
+        );
       }
 
+      // Build the group entity
       final newGroup = GroupEntity(
         id: '',
         name: groupName,
         membersCount: members.length,
         description: _selectedCategory,
-        coverImageUrl: '',
+        coverImageUrl: '', // Will be updated after upload
         currency: _selectedCurrency.split(' ')[0],
         createdBy: uid,
         isArchived: false,
@@ -202,9 +209,14 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
         ),
       );
 
-      final groupId = await controller.createNewGroup(newGroup /*, imageFile: _selectedImage*/);
-      if (groupId == null) throw Exception("Group creation failed");
+      // Create group (with optional image upload)
+      final groupId = await controller.createNewGroup(
+        newGroup,
+        imageFile: _selectedImage, // Pass the selected image file (can be null)
+      );
+      if (groupId == null) throw Exception('Group creation failed');
 
+      // Add all members to the newly created group
       for (var member in members) {
         final identifier = member.userId.isNotEmpty ? member.userId : member.userId;
         final name = member.name;
@@ -214,9 +226,19 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
       }
 
       if (!mounted) return;
+      // Navigate to the group detail screen and remove the creation screen from stack
       Get.off(() => GroupDetailScreen(groupId: groupId));
     } catch (e) {
-      Get.snackbar("Error", e.toString());
+      // Show user-friendly error message
+      Get.snackbar(
+        'Creation Failed',
+        e.toString().contains('internet') || e.toString().contains('Network')
+            ? 'No internet connection. Please try again.'
+            : e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }

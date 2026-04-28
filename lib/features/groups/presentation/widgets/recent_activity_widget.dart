@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:roomly/features/home/presentation/pages/activity_page.dart';
+import '../../../../core/util/app_logger.dart';
 import '../../../activity/domain/entity/activity.dart';
 import '../../../activity/presentation/controller/activity_controller.dart';
 import '../controller/group_controller.dart';
@@ -20,12 +20,15 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
   @override
   void initState() {
     super.initState();
+    // Load activities for this group only
     activityController.loadActivities(widget.groupId);
+    AppLogger.d('RecentActivityWidget initialized for group ${widget.groupId}');
   }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      // Loading state
       if (activityController.isLoading.value) {
         return const Padding(
           padding: EdgeInsets.all(20),
@@ -33,15 +36,35 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
         );
       }
 
+      // Error state
       if (activityController.errorMessage.isNotEmpty) {
         return Padding(
           padding: const EdgeInsets.all(20),
-          child: Text(activityController.errorMessage.value, style: const TextStyle(color: Colors.red)),
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 8),
+              Text(
+                activityController.errorMessage.value,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () {
+                  activityController.loadActivities(widget.groupId);
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         );
       }
 
+      // Take only first 3 activities
       final recentActivities = activityController.activities.take(3).toList();
-      // Build a map of userId -> name from groupsController.members
+
+      // Build member name map from groupsController.members
       final Map<String, String> memberNames = {};
       for (var member in groupsController.members) {
         memberNames[member.userId] = member.name;
@@ -50,7 +73,7 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
       return Column(
         children: [
           Padding(
-            padding: const EdgeInsets.only(right: 29),
+            padding: const EdgeInsets.only(right: 20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -61,22 +84,25 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivityScreen()));
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.only(right: 20),
-                    child: Text('See All'),
+                // See All button (navigates to full activity screen)
+                if (activityController.activities.isNotEmpty)
+                  TextButton(
+                    onPressed: () {
+                      // Navigate to full activity screen
+                      Get.toNamed('/activity', arguments: {'groupId': widget.groupId});
+                    },
+                    child: const Text('See All'),
                   ),
-                ),
               ],
             ),
           ),
           if (recentActivities.isEmpty)
             const Padding(
               padding: EdgeInsets.all(20),
-              child: Text("No activity yet"),
+              child: Text(
+                "No activity yet",
+                style: TextStyle(color: Colors.grey),
+              ),
             )
           else
             Column(
@@ -87,7 +113,6 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
     });
   }
 
-  // FIXED: show user name instead of userId
   Widget _buildActivityCard(Activity activity, Map<String, String> memberNames) {
     if (activity.type == ActivityType.expense) {
       final payerName = memberNames[activity.createdBy] ?? activity.createdBy ?? 'Someone';
@@ -97,6 +122,13 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -107,12 +139,12 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    activity.description ?? '',
+                    activity.description ?? 'Expense',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
                     "Paid by $payerName",
-                    style: const TextStyle(color: Colors.grey),
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
               ),
@@ -125,6 +157,7 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
         ),
       );
     } else {
+      // Settlement activity
       final fromName = memberNames[activity.from] ?? activity.from ?? 'Someone';
       final toName = memberNames[activity.to] ?? activity.to ?? 'Someone';
       return Container(
@@ -133,12 +166,24 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             const Icon(Icons.handshake, color: Colors.green),
             const SizedBox(width: 12),
-            Expanded(child: Text("$fromName → $toName")),
+            Expanded(
+              child: Text(
+                "$fromName → $toName",
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
             Text(
               "\$${activity.amount?.toStringAsFixed(2) ?? '0.00'}",
               style: const TextStyle(fontWeight: FontWeight.bold),

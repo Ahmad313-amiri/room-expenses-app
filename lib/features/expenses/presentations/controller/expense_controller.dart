@@ -1,15 +1,12 @@
-// lib/features/expenses/presentation/controllers/group_expense_split_controller.dart
+// lib/features/expenses/presentations/controller/expense_controller.dart
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../../../core/util/app_logger.dart';
+import '../../../../core/util/error_handler.dart';
 import '../../../groups/domain/entities/member_entity.dart';
-import '../../../home/presentation/pages/activity_page.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/usecases/create_expense_usecase.dart';
-
 
 class GroupExpenseSplitController extends GetxController {
   final AddExpenseUseCase addExpenseUseCase;
@@ -24,6 +21,7 @@ class GroupExpenseSplitController extends GetxController {
   var participantIds = <String>[].obs;
   var customShares = <String, double>{}.obs;
   var selectedPayerId = ''.obs;
+  var isLoading = false.obs; // جدید: برای غیرفعال کردن دکمه در حین ذخیره
 
   late List<MemberEntity> members;
   late String groupId;
@@ -34,6 +32,7 @@ class GroupExpenseSplitController extends GetxController {
     participantIds.value = members.map((m) => m.userId).toList();
     customShares.value = {for (var m in members) m.userId: 0.0};
     selectedPayerId.value = members.first.userId;
+    AppLogger.i('Expense controller initialized for group $groupId');
   }
 
   double get totalAmount => double.tryParse(amountController.text) ?? 0.0;
@@ -93,37 +92,38 @@ class GroupExpenseSplitController extends GetxController {
   }
 
   Future<void> saveExpense() async {
-    print("GROUP ID = $groupId");
+    // جلوگیری از چند بار کلیک
+    if (isLoading.value) return;
+
     if (!isSplitValid) {
-      Get.snackbar('Error', 'Total shares do not match the total amount');
+      ErrorHandler.handleError('Invalid Split', 'Total shares do not match the total amount');
       return;
     }
 
     if (groupId.isEmpty) {
-      Get.snackbar("Error", "Group ID missing");
+      ErrorHandler.handleError('Missing Data', 'Group ID is missing');
       return;
     }
-    if (descriptionController.text.trim().isEmpty) {
-      Get.snackbar('Error', 'Please enter a description');
+
+    final description = descriptionController.text.trim();
+    if (description.isEmpty) {
+      ErrorHandler.handleValidationError('Please enter a description');
       return;
     }
 
     final amount = totalAmount;
-    final description = descriptionController.text.trim();
+    if (amount <= 0) {
+      ErrorHandler.handleValidationError('Amount must be greater than zero');
+      return;
+    }
+
     final shares = calculateShares();
+    final paidBy = <String, double>{selectedPayerId.value: amount};
 
-    final paidBy = <String, double>{
-      selectedPayerId.value: amount,
-    };
-    print("🔥 CREATE EXPENSE CALLED");
-    final expenseId = FirebaseFirestore.instance.collection('groups')
-        .doc(groupId)
-        .collection('expenses')
-        .doc()
-        .id;
-
+    // تولید ID به صورت خودکار – نیازی به دسترسی مستقیم به Firestore نیست
+    // استفاده‌کیس خودش ID را مدیریت می‌کند (در ExpenseRemoteDataSource)
     final expense = Expense(
-      id: expenseId,
+      id: '', // خالی بگذارید تا remote آن را تولید کند
       amount: amount,
       description: description,
       date: DateTime.now(),
@@ -134,32 +134,24 @@ class GroupExpenseSplitController extends GetxController {
       split: shares,
     );
 
+    isLoading.value = true;
+
     try {
       await addExpenseUseCase(expense);
+      AppLogger.i('Expense saved successfully in group $groupId');
 
-      print("✅ EXPENSE SAVED SUCCESSFULLY");
+      // نمایش پیام موفقیت
+      ErrorHandler.showSuccess('Success', 'Expense added successfully');
 
-      Get.offAll(() => ActivityScreen());
-
-      Future.delayed(const Duration(milliseconds: 200), () {
-        Get.snackbar(
-          'Success',
-          'Expense saved successfully',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
-        );
-      });
-
-    } catch (e) {
-    Get.snackbar(
-    'Error',
-    'Failed to save expense: $e',
-    backgroundColor: Colors.red,
-    colorText: Colors.white,
-    );
+      // برگشت به صفحه قبل (صفحه جزئیات گروه)
+      Get.back(result: true);
+    } catch (e, stack) {
+      AppLogger.e('Failed to save expense', e, stack);
+      final message = ErrorHandler.getUserFriendlyException(e);
+      ErrorHandler.handleError('Save Failed', message);
+    } finally {
+      isLoading.value = false;
     }
-    // Get.back();
   }
 
   @override

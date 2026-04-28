@@ -2,17 +2,17 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../data/data_sources/group_remote_datasource.dart';
-import '../../data/repository/group_repository_impl.dart';
-import '../../domain/repositories/group_repository.dart';
-import '../../domain/usecases/add_member.dart';
-import '../../domain/usecases/create_group.dart';
-import '../../domain/usecases/delete_group.dart';
-import '../../domain/usecases/get_groups.dart';
-import '../../domain/usecases/get_members.dart';
-import '../../domain/usecases/search_users_usecase.dart';
-import '../../domain/usecases/update_member_status.dart';
-import '../controller/group_controller.dart';
+import '../../../groups/data/data_sources/group_remote_datasource.dart';
+import '../../../groups/data/repository/group_repository_impl.dart';
+import '../../../groups/domain/repositories/group_repository.dart';
+import '../../../groups/domain/usecases/add_member.dart';
+import '../../../groups/domain/usecases/create_group.dart';
+import '../../../groups/domain/usecases/delete_group.dart';
+import '../../../groups/domain/usecases/get_groups.dart';
+import '../../../groups/domain/usecases/get_members.dart';
+import '../../../groups/domain/usecases/search_users_usecase.dart';
+import '../../../groups/domain/usecases/update_member_status.dart';
+import '../../../groups/presentation/controller/group_controller.dart';
 
 /// Dependency Injection binding for Groups feature
 /// Registers all repositories, use cases, and controllers

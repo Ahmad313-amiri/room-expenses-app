@@ -1,13 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:roomly/features/home/presentation/pages/activity_page.dart';
+import '../../../../core/util/app_logger.dart';
+import '../../../../core/util/error_handler.dart';
 import '../../../activity/presentation/activity_widget.dart';
 import '../../../activity/presentation/controller/activity_controller.dart';
 import '../../../activity/domain/entity/activity.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
 import '../widgets/activity_card.dart';
 import '../widgets/owed_card.dart';
+import 'activity_page.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
@@ -24,9 +26,6 @@ class _MainDashboardState extends State<MainDashboard> {
   @override
   void initState() {
     super.initState();
-    if (!Get.isRegistered<GroupsController>()) {
-      // Register if needed
-    }
     groupController = Get.find<GroupsController>();
     if (!Get.isRegistered<ActivityController>()) {
       Get.put(ActivityController());
@@ -40,8 +39,9 @@ class _MainDashboardState extends State<MainDashboard> {
     try {
       await groupController.fetchGroups(initialLoad: true);
       await activityController.fetchAllActivities(initialLoad: true);
-    } catch (_) {
-      // Handled in UI
+    } catch (e) {
+      AppLogger.e('Dashboard load error', e);
+      ErrorHandler.handleError('Load Error', ErrorHandler.getUserFriendlyException(e));
     }
     if (mounted) setState(() => _isInitialLoading = false);
   }
@@ -50,7 +50,9 @@ class _MainDashboardState extends State<MainDashboard> {
     try {
       await groupController.refreshGroups();
       await activityController.refreshAll();
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.e('Refresh error', e);
+    }
   }
 
   @override
@@ -75,10 +77,7 @@ class _MainDashboardState extends State<MainDashboard> {
                     child: Center(
                       child: Text(
                         'Dashboard',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -87,15 +86,10 @@ class _MainDashboardState extends State<MainDashboard> {
             ),
             // Net Standing Card
             Obx(() {
-              final net =
-                  activityController.totalYouAreOwed.value -
-                  activityController.totalYouOwe.value;
+              final net = activityController.totalYouAreOwed.value - activityController.totalYouOwe.value;
               return Container(
                 width: 600,
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 10,
-                ),
+                margin: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.blue,
                   borderRadius: BorderRadius.circular(15),
@@ -105,10 +99,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'TOTAL NET STANDING',
-                        style: TextStyle(color: Colors.grey[200]),
-                      ),
+                      Text('TOTAL NET STANDING', style: TextStyle(color: Colors.grey[200])),
                       Text(
                         '${net >= 0 ? '+' : '-'}\$${net.abs().toStringAsFixed(2)}',
                         style: TextStyle(
@@ -128,9 +119,7 @@ class _MainDashboardState extends State<MainDashboard> {
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
-                              ),
+                              border: Border.all(color: Colors.white.withOpacity(0.3)),
                             ),
                             child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -139,10 +128,7 @@ class _MainDashboardState extends State<MainDashboard> {
                                 SizedBox(width: 6),
                                 Text(
                                   '% increase this month',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                                 ),
                               ],
                             ),
@@ -190,31 +176,19 @@ class _MainDashboardState extends State<MainDashboard> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Recent Activity',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+                  const Text('Recent Activity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   GestureDetector(
-                    onTap: () => Get.to(ActivityScreen()),
-                    child: const Text(
-                      'View all',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
+                    onTap: () => Get.to(() => const ActivityScreen()),
+                    child: const Text('View all', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 15)),
                   ),
                 ],
               ),
             ),
-
             Expanded(
               child: Obx(() {
                 if (activityController.isLoading.value) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 if (activityController.errorMessage.isNotEmpty) {
                   return Center(
                     child: Column(
@@ -222,44 +196,33 @@ class _MainDashboardState extends State<MainDashboard> {
                       children: [
                         Text(
                           activityController.errorMessage.value,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 16,
-                          ),
+                          style: const TextStyle(color: Colors.red, fontSize: 16),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.refresh),
                           label: const Text('Try Again'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
                           onPressed: _onRefresh,
                         ),
                       ],
                     ),
                   );
                 }
-
                 final recent = activityController.activities.take(5).toList();
                 if (recent.isEmpty) {
-                  return Center(
+                  return const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
+                      children: [
                         Icon(Icons.inbox, size: 64, color: Colors.grey),
                         SizedBox(height: 12),
-                        Text(
-                          'No expenses or settlements found yet.',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
+                        Text('No expenses or settlements found yet.', style: TextStyle(color: Colors.grey, fontSize: 16)),
                       ],
                     ),
                   );
                 }
-
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: ListView.builder(
@@ -269,15 +232,11 @@ class _MainDashboardState extends State<MainDashboard> {
                       final act = recent[index];
                       return GestureDetector(
                         onTap: () {
-                             if ((act as dynamic)?.groupId != null &&
-                              (act as dynamic).groupId is String &&
-                              ((act as dynamic).groupId as String).isNotEmpty) {
-                            Get.toNamed(
-                              '/group-details',
-                              arguments: {'groupId': (act as dynamic).groupId},
-                            );
+                          // فعالیت‌ها دارای groupId هستند (در ActivityController بارگذاری می‌شوند)
+                          final groupId = act.groupId;
+                          if (groupId.isNotEmpty) {
+                            Get.toNamed('/group-details', arguments: {'groupId': groupId});
                           }
-                          // Else do nothing or custom
                         },
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 10),
@@ -293,21 +252,15 @@ class _MainDashboardState extends State<MainDashboard> {
                             ],
                           ),
                           child: ActivityCard(
-                            icon: act.type == ActivityType.expense
-                                ? Icons.receipt_long
-                                : Icons.swap_horiz,
+                            icon: act.type == ActivityType.expense ? Icons.receipt_long : Icons.swap_horiz,
                             amount: act.amount ?? 0.0,
                             description: act.type == ActivityType.expense
                                 ? act.description ?? ''
                                 : '${act.from} → ${act.to}',
                             status: act.status ?? '',
                             time: _formatDate(act.date),
-                            title: act.type == ActivityType.expense
-                                ? act.description ?? 'Expense'
-                                : 'Settlement',
-                            iconColor: act.type == ActivityType.expense
-                                ? Colors.blue
-                                : Colors.green,
+                            title: act.type == ActivityType.expense ? act.description ?? 'Expense' : 'Settlement',
+                            iconColor: act.type == ActivityType.expense ? Colors.blue : Colors.green,
                           ),
                         ),
                       );
@@ -325,9 +278,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
-    if (date.day == now.day &&
-        date.month == now.month &&
-        date.year == now.year) {
+    if (date.day == now.day && date.month == now.month && date.year == now.year) {
       return 'Today';
     } else if (date.day == now.subtract(const Duration(days: 1)).day) {
       return 'Yesterday';

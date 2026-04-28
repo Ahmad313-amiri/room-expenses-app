@@ -1,10 +1,11 @@
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:roomly/core/util/net_work.dart';
 
+import '../../../../core/util/net_work.dart';
 import '../../../../settings/settings_controller.dart';
 import '../../../../settings/theme_controller.dart';
+import '../../../auth/data/repository/authentication_repository.dart';
 import '../../../expenses/data/datasources/expense_remote_datasource.dart';
 import '../../../expenses/data/repository/expense_repository_impl.dart';
 import '../../../expenses/domain/repository/expense_repository.dart';
@@ -24,7 +25,7 @@ import '../../../groups/domain/usecases/get_members.dart';
 import '../../../groups/domain/usecases/search_users_usecase.dart';
 import '../../../groups/domain/usecases/update_member_status.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
-import '../../data/repository/authentication_repository.dart';
+
 
 class AppBinding extends Bindings {
   @override
@@ -33,7 +34,9 @@ class AppBinding extends Bindings {
     final firestore = FirebaseFirestore.instance;
     final storage = FirebaseStorage.instance;
 
-    Get.lazyPut(()=>NetworkService());
+    // ================= NETWORK SERVICE (اضافه شد) =================
+    Get.put(NetworkService(), permanent: true);
+
     // ================= AUTH =================
     Get.put(AuthenticationRepository(), permanent: true);
 
@@ -72,7 +75,7 @@ class AppBinding extends Bindings {
       permanent: true,
     );
 
-    // ================= EXPENSE DATA (lazy – created when needed) =================
+    // ================= EXPENSE (lazy) =================
     Get.lazyPut<ExpenseRemoteDataSource>(
           () => ExpenseRemoteDataSource(firestore: firestore),
       fenix: true,
@@ -81,20 +84,14 @@ class AppBinding extends Bindings {
           () => ExpenseRepositoryImpl(Get.find()),
       fenix: true,
     );
-
-
-
-    Get.put(SettingsController(), permanent: true);
-    Get.put(ThemeController(), permanent: true);
-    Get.put(NetworkService(), permanent: true);
-
-    // ================= EXPENSE USE CASES =================
     Get.lazyPut(() => AddExpenseUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => UpdateExpenseUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => DeleteExpenseUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => WatchGroupExpensesUseCase(Get.find()), fenix: true);
-    Get.lazyPut(() => WatchGroupExpensesUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => CalculateGroupSettlementUseCase(), fenix: true);
 
+    // ================= SETTINGS & THEME =================
+    Get.put(SettingsController(), permanent: true);
+    Get.put(ThemeController(), permanent: true);
   }
 }

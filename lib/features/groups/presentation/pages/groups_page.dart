@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:roomly/features/groups/presentation/pages/groups_details_page.dart';
-import 'package:roomly/features/groups/presentation/pages/groups_not_found.dart';
-
-import '../binding/group_binding.dart';
+import '../../../../core/util/error_handler.dart';
 import '../controller/group_controller.dart';
+import 'groups_details_page.dart';
+import 'groups_not_found.dart';
+
 class GroupsPage extends StatelessWidget {
   const GroupsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     if (!Get.isRegistered<GroupsController>()) {
-      GroupBinding().dependencies();
+      Get.put(GroupsController(
+        searchUsersUseCase: Get.find(),
+        getGroupsUseCase: Get.find(),
+        createGroupUseCase: Get.find(),
+        addMemberUseCase: Get.find(),
+        deleteGroupUseCase: Get.find(),
+        getMembersUseCase: Get.find(),
+        remoteDataSource: Get.find(),
+        updateMemberStatusUseCase: Get.find(),
+      ));
     }
     final controller = Get.find<GroupsController>();
 
@@ -23,7 +32,7 @@ class GroupsPage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline, size: 28),
-            onPressed: () => Get.toNamed('/create_group'),
+            onPressed: () => Get.toNamed('/create-group'),
           ),
           const SizedBox(width: 15),
         ],
@@ -74,12 +83,17 @@ class GroupsPage extends StatelessWidget {
           ),
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
         ),
-        onChanged:  controller.filterGroups,
+        onChanged: controller.filterGroups,
       ),
     );
   }
 
   Widget _buildGroupCard(dynamic group) {
+    // پشتیبانی از coverImageUrl برای نمایش عکس واقعی گروه
+    final hasCoverImage = group.coverImageUrl != null &&
+        group.coverImageUrl is String &&
+        group.coverImageUrl.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -101,7 +115,12 @@ class GroupsPage extends StatelessWidget {
               CircleAvatar(
                 radius: 30,
                 backgroundColor: Colors.blue.shade100,
-                child: const Icon(Icons.group, size: 30, color: Colors.blue),
+                backgroundImage: hasCoverImage
+                    ? NetworkImage(group.coverImageUrl) as ImageProvider
+                    : null,
+                child: !hasCoverImage
+                    ? const Icon(Icons.group, size: 30, color: Colors.blue)
+                    : null,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -132,8 +151,10 @@ class GroupsPage extends StatelessWidget {
               MembersAvatars(count: group.membersCount ?? 0),
               ElevatedButton(
                 onPressed: () {
-                   if (group.id != null) {
-                    Get.to(() => GroupDetailScreen(groupId: group.id!));
+                  if (group.id != null && group.id.isNotEmpty) {
+                    Get.to(() => GroupDetailScreen(groupId: group.id));
+                  } else {
+                    ErrorHandler.handleError('Error', 'Invalid group data');
                   }
                 },
                 style: ElevatedButton.styleFrom(

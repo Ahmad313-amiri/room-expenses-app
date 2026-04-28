@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:io';
@@ -10,6 +11,37 @@ import 'app_logger.dart';
 /// Centralized error handling for the entire application
 /// Handles different types of errors with appropriate user feedback
 class ErrorHandler {
+
+
+  /// Convert any exception to a user-friendly message
+  static String getUserFriendlyException(dynamic error) {
+    if (error is FirebaseException) {
+      switch (error.code) {
+        case 'permission-denied':
+          return 'You don\'t have permission to perform this action.';
+        case 'unavailable':
+          return 'Service is temporarily unavailable. Please try again.';
+        case 'not-found':
+          return 'The requested data was not found.';
+        case 'already-exists':
+          return 'This item already exists.';
+        default:
+          return 'Firebase error: ${error.message}';
+      }
+    }
+    if (error is TimeoutException) {
+      return 'Request timed out. Check your internet connection.';
+    }
+    if (error is SocketException) {
+      return 'No internet connection. Please connect and try again.';
+    }
+    if (error is Exception) {
+      return error.toString().replaceFirst('Exception:', '').trim();
+    }
+    return 'An unexpected error occurred. Please try again.';
+  }
+
+
   /// Handle API/Network errors
   static void handleApiError(dynamic error) {
     AppLogger.error('API Error', error);
@@ -126,3 +158,5 @@ class ErrorHandler {
     );
   }
 }
+
+

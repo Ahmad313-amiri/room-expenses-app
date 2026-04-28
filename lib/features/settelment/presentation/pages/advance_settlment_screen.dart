@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../home/presentation/pages/activity_page.dart';
+import 'package:get/get.dart';
+import '../../../../core/util/app_logger.dart';
+import '../../../../core/util/error_handler.dart';
+import '../../../../core/util/net_work.dart';
+import '../../../groups/presentation/controller/group_controller.dart';
+import '../../data/data_sources/settelment_remote_datasource.dart';
 
 
 class AdvancedSettleUpScreen extends StatefulWidget {
@@ -20,97 +24,120 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
   final List<String> _methods = ['Bank Transfer', 'Cash', 'Digital Wallet', 'Other'];
 
   List<Map<String, dynamic>> members = [];
-
   String? selectedPayer;
   String? selectedReceiver;
-
   bool isLoading = false;
+  bool isMembersLoading = true;
+  String membersError = '';
+
+  late final SettlementRemoteDataSource _settlementDataSource;
+  late final NetworkService _networkService;
+  late final GroupsController _groupsController;
 
   @override
   void initState() {
     super.initState();
-    fetchMembers();
+    _settlementDataSource = SettlementRemoteDataSource();
+    _networkService = Get.find<NetworkService>();
+    _groupsController = Get.find<GroupsController>();
+    _fetchMembers();
   }
 
-  // ---------------- FETCH MEMBERS ----------------
-  Future<void> fetchMembers() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.groupId)
-        .collection('members')
-        .get();
-
-    members = snapshot.docs.map((doc) {
-      return {
-        'id': doc.id,
-        'name': doc['name'],
-        'userId': doc['userId'],
-      };
-    }).toList();
-
-    if (mounted) setState(() {});
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
   }
 
-
-  // ---------------- SAVE SETTLEMENT ----------------
-  Future<void> saveSettlement() async {
-    final amount = double.tryParse(_amountController.text) ?? 0;
-
-      if (selectedPayer == null || selectedReceiver == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all fields")),
-      );
+  Future<void> _fetchMembers() async {
+    if (!_networkService.isOnline) {
+      setState(() {
+        isMembersLoading = false;
+        membersError = 'No internet connection. Cannot load members.';
+      });
       return;
     }
 
+    setState(() {
+      isMembersLoading = true;
+      membersError = '';
+    });
+
+    try {
+      // استفاده از کنترلر گروه برای دریافت اعضا (که قبلاً بازنویسی شده و از ErrorHandler استفاده می‌کند)
+      await _groupsController.loadMembers(widget.groupId);
+      final memberEntities = _groupsController.members;
+      members = memberEntities.map((m) {
+        return {
+          'id': m.userId,
+          'name': m.name,
+          'userId': m.userId,
+        };
+      }).toList();
+      AppLogger.i('Fetched ${members.length} members for settlement');
+      setState(() => isMembersLoading = false);
+    } catch (e, stack) {
+      AppLogger.e('Error fetching members for settlement', e, stack);
+      setState(() {
+        membersError = ErrorHandler.getUserFriendlyException(e);
+        isMembersLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveSettlement() async {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+
+    if (selectedPayer == null || selectedReceiver == null) {
+      ErrorHandler.handleValidationError('Please select both payer and receiver');
+      return;
+    }
     if (selectedPayer == selectedReceiver) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Payer and Receiver cannot be same")),
-      );
+      ErrorHandler.handleValidationError('Payer and receiver cannot be the same');
+      return;
+    }
+    if (amount <= 0) {
+      ErrorHandler.handleValidationError('Please enter a valid amount greater than zero');
+      return;
+    }
+    if (!_isConfirmed) {
+      ErrorHandler.handleValidationError('Please confirm that you have made this payment');
+      return;
+    }
+    if (!_networkService.isOnline) {
+      ErrorHandler.handleError('Offline', 'You need internet connection to record settlement');
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId)
-          .collection('settlements')
-          .add({
+      final data = {
         'from': selectedPayer,
         'to': selectedReceiver,
         'amount': amount,
         'paymentMethod': _paymentMethod,
         'date': _selectedDate,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        'groupId': widget.groupId,
+      };
+      await _settlementDataSource.saveSettlement(widget.groupId, data);
+      AppLogger.i('Settlement saved in group ${widget.groupId}');
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Settlement saved successfully "),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>  ActivityScreen(),),
-
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // نمایش پیام موفقیت
+      if (mounted) {
+        ErrorHandler.showSuccess('Success', 'Settlement recorded successfully');
+        // برگشت به صفحه گروه (صفحه جزئیات گروه)
+        Get.back(result: true);
+      }
+    } catch (e, stack) {
+      AppLogger.e('Failed to save settlement', e, stack);
+      if (mounted) {
+        final message = ErrorHandler.getUserFriendlyException(e);
+        ErrorHandler.handleError('Failed to Save', message);
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-
-    if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -121,9 +148,7 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
       lastDate: DateTime(2101),
     );
     if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      setState(() => _selectedDate = picked);
     }
   }
 
@@ -142,174 +167,201 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
           'Record Settlement',
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
-         centerTitle: true,
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DropdownButtonFormField<String>(
-              value: selectedPayer,
-              hint: const Text("Select Payer"),
-              items: members.map<DropdownMenuItem<String>>((m) {
-                return DropdownMenuItem<String>(
-                  value: m['id'] as String,
-                  child: Text(m['name'] as String),
-                );
-              }).toList(),
-              onChanged: (val) => setState(() => selectedPayer = val),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: selectedReceiver,
-              hint: const Text("Select Receiver"),
-              items: members.map<DropdownMenuItem<String>>((m) {
-                return DropdownMenuItem<String>(
-                  value: m['id'] as String,
-                  child: Text(m['name'] as String),
-                );
-              }).toList(),
-              onChanged: (val) => setState(() => selectedReceiver = val),
-            ),
-            const SizedBox(height: 24),
-            const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-              decoration: InputDecoration(
-                // prefixIcon: const Padding(
-                //   padding: EdgeInsets.only(top: 8, left: 16, right: 8),
-                //   child: Text('', style: TextStyle(fontSize: 30, color: Colors.black)),
-                // ),
-                hintText: '0.00',
-                hintStyle: TextStyle(color: Colors.grey[300]),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[200]!),
+            // نمایش وضعیت بارگذاری اعضا
+            if (isMembersLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (membersError.isNotEmpty)
+              Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const SizedBox(height: 16),
+                    Text(membersError, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _fetchMembers,
+                      child: const Text('Retry'),
+                    ),
+                  ],
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[200]!),
+              )
+            else ...[
+                // انتخاب پرداخت‌کننده
+                DropdownButtonFormField<String>(
+                  value: selectedPayer,
+                  hint: const Text("Select Payer"),
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  items: members.map<DropdownMenuItem<String>>((m) {
+                    return DropdownMenuItem<String>(
+                      value: m['userId'] as String,
+                      child: Text(m['name'] as String),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => selectedPayer = val),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _paymentMethod,
-                            isExpanded: true,
-                            onChanged: (String? newValue) {
-                              setState(() {
-                                _paymentMethod = newValue!;
-                              });
-                            },
-                            items: _methods.map<DropdownMenuItem<String>>((String value) {
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(value),
-                              );
-                            }).toList(),
+                const SizedBox(height: 12),
+                // انتخاب گیرنده
+                DropdownButtonFormField<String>(
+                  value: selectedReceiver,
+                  hint: const Text("Select Receiver"),
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  items: members.map<DropdownMenuItem<String>>((m) {
+                    return DropdownMenuItem<String>(
+                      value: m['userId'] as String,
+                      child: Text(m['name'] as String),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => selectedReceiver = val),
+                ),
+                const SizedBox(height: 24),
+                // مبلغ
+                const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    hintText: '0.00',
+                    hintStyle: TextStyle(color: Colors.grey.shade300),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // روش پرداخت و تاریخ در یک ردیف
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _paymentMethod,
+                                isExpanded: true,
+                                onChanged: (String? newValue) {
+                                  setState(() => _paymentMethod = newValue!);
+                                },
+                                items: _methods.map<DropdownMenuItem<String>>((String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () => _selectDate(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(DateFormat('MMM dd, yyyy').format(_selectedDate)),
+                                  const Icon(Icons.calendar_today, size: 18, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // تأیید پرداخت واقعی
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _isConfirmed,
+                        activeColor: Colors.blue,
+                        onChanged: (val) => setState(() => _isConfirmed = val ?? false),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'I confirm that this payment has been made in real life.',
+                          style: TextStyle(fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () => _selectDate(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(DateFormat('MM/dd/yyyy').format(_selectedDate)),
-                              const Icon(Icons.calendar_today, size: 18, color: Colors.grey),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Checkbox(
-                    value: _isConfirmed,
-                    activeColor: Colors.blue,
-                    onChanged: (val) => setState(() => _isConfirmed = val!),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('I have made this payment in real life', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ],
+                const SizedBox(height: 32),
+                // دکمه ثبت
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: (_isConfirmed && !isLoading && selectedPayer != null && selectedReceiver != null)
+                        ? _saveSettlement
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                      'Record Settlement',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isConfirmed && !isLoading
-                    ? saveSettlement
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
-                  disabledBackgroundColor: Colors.grey[300],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                  'Record Settlement',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
+                const SizedBox(height: 20),
+              ],
           ],
         ),
       ),

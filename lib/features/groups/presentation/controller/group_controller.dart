@@ -1,28 +1,32 @@
+import 'dart:io';
 import 'dart:async';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../../../core/util/app_logger.dart';
+import '../../../../core/util/error_handler.dart';
+import '../../../../core/util/net_work.dart';
 import '../../../auth/data/repository/authentication_repository.dart';
-import '../../../home/presentation/pages/controller/home_page_controller.dart';
-import '../../../home/presentation/pages/home_screen.dart';
 import '../../data/data_sources/group_remote_datasource.dart';
 import '../../data/models/group_model.dart';
 import '../../domain/entities/group.dart';
 import '../../domain/entities/member_entity.dart';
-import '../../domain/usecases/create_group.dart';
-import '../../domain/usecases/get_groups.dart';
 import '../../domain/usecases/add_member.dart';
+import '../../domain/usecases/create_group.dart';
 import '../../domain/usecases/delete_group.dart';
+import '../../domain/usecases/get_groups.dart';
 import '../../domain/usecases/get_members.dart';
 import '../../domain/usecases/search_users_usecase.dart';
 import '../../domain/usecases/update_member_status.dart';
-import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:image_picker/image_picker.dart';
+import '../widgets/contact_model.dart' hide Contact;
 
 class GroupsController extends GetxController {
+  // Dependencies
   final SearchUsersUseCase searchUsersUseCase;
   final GetGroups getGroupsUseCase;
   final CreateGroup createGroupUseCase;
@@ -43,120 +47,80 @@ class GroupsController extends GetxController {
     required this.updateMemberStatusUseCase,
   });
 
+  // Reactive state
   var groups = <GroupEntity>[].obs;
+  var allGroups = <GroupModel>[].obs;
   var members = <MemberEntity>[].obs;
   var isLoading = false.obs;
   var searchResults = <Map<String, dynamic>>[].obs;
   var isSearching = false.obs;
   var searchError = ''.obs;
   var contacts = <Contact>[].obs;
-  var allGroups = <GroupModel>[].obs;
-  var groupId = ''.obs;
 
-  // --- GroupDetailScreen ---
+  // Group detail screen state
   final currentGroup = Rxn<GroupEntity>();
   final groupImageFile = Rxn<File>();
   final isLoadingImage = false.obs;
   final balanceText = '0.0'.obs;
 
+  // Misc
   Timer? _debounce;
-  bool _isDisposed = false;
   StreamSubscription<QuerySnapshot>? _expenseSubscription;
-
-  final Connectivity _connectivity = Connectivity();
-  final RxBool _isOnline = true.obs;
-  bool get isOnline => _isOnline.value;
-
-  @override
-  void onInit() {
-    super.onInit();
-    _isDisposed = false;
-    _monitorConnectivity();
-    fetchGroups();
-  }
-
-  @override
-  void onClose() {
-    _isDisposed = true;
-    _debounce?.cancel();
-    _expenseSubscription?.cancel();
-    super.onClose();
-  }
-
-  void _monitorConnectivity() {
-    _connectivity.onConnectivityChanged.listen((result) {
-      _isOnline.value = result != ConnectivityResult.none;
-      if (_isOnline.value) {
-        fetchGroups();
-        if (currentGroup.value != null)
-          loadGroupAndMembers(currentGroup.value!.id);
-      }
-    });
-  }
+  final NetworkService _networkService = Get.find<NetworkService>();
 
   String? get currentUserId {
     final authRepo = Get.find<AuthenticationRepository>();
     return authRepo.firebaseUser.value?.uid;
   }
 
-  bool canRemoveMember(MemberEntity member) {
-    final currentUser = members.firstWhereOrNull(
-      (m) => m.userId == currentUserId,
-    );
-    if (currentUser == null) return false;
-    final isAdmin = currentUser.role == 'admin';
-    final isSelf = member.userId == currentUserId;
-    return isAdmin && !isSelf;
+  // ============================================================
+  // Lifecycle
+  // ============================================================
+  @override
+  void onInit() {
+    super.onInit();
+    fetchGroups();
   }
 
-  // ------------------------------------------------------------
-  // GROUP FETCHING & FILTERING
-  // ------------------------------------------------------------
+  @override
+  void onClose() {
+    _debounce?.cancel();
+    _expenseSubscription?.cancel();
+    super.onClose();
+  }
 
-  Future<void> fetchGroups({
-    bool forceRefresh = false,
-    bool initialLoad = false,
-  }) async {
+
+  // ==========  getter groupId ==========
+  String get groupId => currentGroup.value?.id ?? '';
+
+
+
+  // ============================================================
+  // Group fetching
+  // ============================================================
+  Future<void> fetchGroups({bool forceRefresh = false, bool initialLoad = false}) async {
+    if (!_networkService.isOnline && !forceRefresh) {
+      if (!initialLoad) {
+        ErrorHandler.showInfo('Offline', 'Showing cached data. Connect to refresh.');
+      }
+      return;
+    }
     try {
       isLoading.value = true;
-      final authRepo = Get.find<AuthenticationRepository>();
-      final uid = authRepo.firebaseUser.value?.uid;
+      final uid = currentUserId;
       if (uid == null) {
-        print("User not logged in");
-        isLoading.value = false;
+        AppLogger.w('fetchGroups: User not logged in');
         return;
       }
-      if (!_isOnline.value && !forceRefresh) {
-        if (!initialLoad) {
-          _showErrorSnackbar(
-            "Offline",
-            "You are offline. Showing cached data.",
-          );
-        }
-        return;
-      }
-      final remoteGroups = await getGroupsUseCase
-          .call(uid)
-          .timeout(Duration(seconds: 15));
-      final models = remoteGroups
-          .map((e) => e is GroupModel ? e : GroupModel.fromEntity(e))
-          .toList();
+      final remoteGroups = await getGroupsUseCase(uid).timeout(const Duration(seconds: 15));
+      final models = remoteGroups.map((e) => e is GroupModel ? e : GroupModel.fromEntity(e)).toList();
       groups.assignAll(models);
       allGroups.assignAll(models);
-    } catch (e) {
-      print("Fetch groups error: $e");
+      AppLogger.i('Fetched ${models.length} groups');
+    } catch (e, stack) {
+      AppLogger.e('fetchGroups error', e, stack);
       if (!initialLoad) {
-        if (e is TimeoutException) {
-          _showErrorSnackbar(
-            "Timeout",
-            "Network took too long. Please try again.",
-          );
-        } else {
-          _showErrorSnackbar(
-            "Network Error",
-            "Failed to load groups. Check your internet.",
-          );
-        }
+        ErrorHandler.handleError('Network Error', ErrorHandler.getUserFriendlyException(e));
       }
     } finally {
       isLoading.value = false;
@@ -167,37 +131,28 @@ class GroupsController extends GetxController {
     if (query.isEmpty) {
       groups.value = allGroups;
     } else {
-      groups.value = allGroups
-          .where((g) => g.name.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      groups.value = allGroups.where((g) => g.name.toLowerCase().contains(query.toLowerCase())).toList();
     }
   }
 
-  // ------------------------------------------------------------
-  // GROUP CRUD
-  // ------------------------------------------------------------
-
+  // ============================================================
+  // Group CRUD
+  // ============================================================
   Future<String?> createNewGroup(GroupEntity group, {File? imageFile}) async {
     try {
       isLoading.value = true;
-      if (group.name.trim().isEmpty) throw Exception("Group name required");
-      if (!_isOnline.value) throw Exception("No internet connection");
-      final remoteId = await createGroupUseCase.call(group);
-      if (imageFile != null) {
-        final imageUrl = await uploadGroupImage(imageFile, remoteId);
-        if (imageUrl != null) {
-          final updatedGroup = (group as GroupModel).copyWith(
-            coverImageUrl: imageUrl,
-          );
-          await updateGroupDetails(updatedGroup);
-        }
-      }
+      if (group.name.trim().isEmpty) throw Exception('Group name required');
+      if (!_networkService.isOnline) throw Exception('No internet connection');
+
+      final remoteId = await createGroupUseCase(group, imageFile: imageFile);
+      // If image was uploaded separately? The use case already handles image upload.
+      // But in our implementation, createGroupUseCase calls repository which handles upload.
       await fetchGroups();
-      _showSuccessSnackbar("Group created successfully");
+      ErrorHandler.showSuccess('Success', 'Group created successfully');
       return remoteId;
-    } catch (e) {
-      print(e);
-      _showErrorSnackbar("Creation Failed", e.toString());
+    } catch (e, stack) {
+      AppLogger.e('createNewGroup error', e, stack);
+      ErrorHandler.handleError('Creation Failed', ErrorHandler.getUserFriendlyException(e));
       return null;
     } finally {
       isLoading.value = false;
@@ -207,108 +162,82 @@ class GroupsController extends GetxController {
   Future<void> updateGroupDetails(GroupEntity group) async {
     try {
       isLoading.value = true;
-      if (group.id.isEmpty) throw Exception("Invalid group ID");
       await remoteDataSource.updateGroup(GroupModel.fromEntity(group));
       await fetchGroups();
-      // Update currentGroup if it's the same group
       if (currentGroup.value?.id == group.id) {
         currentGroup.value = group;
       }
-      _showSuccessSnackbar("Group updated successfully");
-    } catch (e) {
-      print("Update Group Error: $e");
-      _showErrorSnackbar("Failed to update group", e.toString());
+      ErrorHandler.showSuccess('Success', 'Group updated');
+    } catch (e, stack) {
+      AppLogger.e('updateGroupDetails error', e, stack);
+      ErrorHandler.handleError('Update Failed', ErrorHandler.getUserFriendlyException(e));
       rethrow;
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  Future<void> deleteSelectedGroup(String groupId) async {
-    try {
-      isLoading.value = true;
-      if (!_isOnline.value) throw Exception("No internet connection");
-      await deleteGroupUseCase.call(groupId);
-      groups.removeWhere((g) => g.id == groupId);
-      allGroups.removeWhere((g) => g.id == groupId);
-      if (currentGroup.value?.id == groupId) currentGroup.value = null;
-      _showSuccessSnackbar("Group deleted");
-      Get.offAll(() => const HomeScreen());
-      final homeController = Get.find<HomeController>();
-      homeController.changeTab(1);
-    } catch (e) {
-      _showErrorSnackbar("Delete Failed", e.toString());
     } finally {
       isLoading.value = false;
     }
   }
 
+  // ========== refreshGroups  ==========
   Future<void> refreshGroups() async {
     await fetchGroups(forceRefresh: true, initialLoad: false);
   }
 
+// ==========refreshGroupDetail ==========
   Future<void> refreshGroupDetail(String groupId) async {
     await loadGroupAndMembers(groupId, forceRefresh: true);
   }
 
-  // ------------------------------------------------------------
-  // MEMBERS MANAGEMENT
-  // ------------------------------------------------------------
-
-  Future<void> loadMembers(String groupId) async {
+  Future<void> deleteSelectedGroup(String groupId) async {
     try {
       isLoading.value = true;
-      if (groupId.isEmpty) throw Exception("Invalid group ID");
-      final remoteMembers = await getMembersUseCase.call(groupId) ?? [];
-      members.assignAll(remoteMembers);
-      print("RAW MEMBERS COUNT: ${remoteMembers.length}");
-      for (var m in remoteMembers) {
-        print("MEMBER: ${m.userId} | ${m.name} | ${m.invitationStatus}");
-      }
-    } catch (e) {
-      print("Error loading members: $e");
-      _showErrorSnackbar("Failed to load members", e.toString());
+      if (!_networkService.isOnline) throw Exception('No internet connection');
+      await deleteGroupUseCase(groupId);
+      groups.removeWhere((g) => g.id == groupId);
+      allGroups.removeWhere((g) => g.id == groupId);
+      if (currentGroup.value?.id == groupId) currentGroup.value = null;
+      ErrorHandler.showSuccess('Deleted', 'Group permanently deleted');
+      Get.offAllNamed('/groups'); // Navigate to groups list
+    } catch (e, stack) {
+      AppLogger.e('deleteSelectedGroup error', e, stack);
+      ErrorHandler.handleError('Delete Failed', ErrorHandler.getUserFriendlyException(e));
     } finally {
-      if (!_isDisposed) isLoading.value = false;
+      isLoading.value = false;
     }
   }
 
-  Future<void> addMemberToGroup(
-    String groupId,
-    String identifier,
-    String name,
-  ) async {
-    debugPrint("━━━━━━━━━━━━━━━━━━━━━━");
-    debugPrint("➕ ADD MEMBER FLOW START");
-    debugPrint("groupId: $groupId");
-    debugPrint("identifier: $identifier");
-    debugPrint("name: $name");
-    debugPrint("━━━━━━━━━━━━━━━━━━━━━━");
+  // ============================================================
+  // Members management
+  // ============================================================
+  Future<void> loadMembers(String groupId) async {
+    try {
+      isLoading.value = true;
+      final remoteMembers = await getMembersUseCase(groupId);
+      members.assignAll(remoteMembers);
+      AppLogger.i('Loaded ${remoteMembers.length} members');
+    } catch (e, stack) {
+      AppLogger.e('loadMembers error', e, stack);
+      ErrorHandler.handleError('Failed to load members', ErrorHandler.getUserFriendlyException(e));
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
+  Future<void> addMemberToGroup(String groupId, String identifier, String name) async {
     try {
       isLoading.value = true;
       if (groupId.isEmpty || identifier.isEmpty || name.isEmpty) {
-        throw Exception("All fields are required");
+        throw Exception('All fields required');
       }
-      if (members.isEmpty) {
-        await loadMembers(groupId);
-      }
-      final value = identifier.trim().toLowerCase();
-      final userData = await remoteDataSource.findUserByEmail(value);
-      final resolvedUserId = userData?['uid'] ?? value;
-      final existingMember = members.firstWhereOrNull(
-        (m) => m.userId == resolvedUserId,
-      );
-      if (existingMember != null) {
-        if (existingMember.invitationStatus == 'pending') {
-          _showErrorSnackbar("Already invited", "Invitation is still pending");
-        } else {
-          _showErrorSnackbar(
-            "Already member",
-            "User already exists in this group",
-          );
-        }
-        return;
+      // Check existing members (refresh if empty)
+      if (members.isEmpty) await loadMembers(groupId);
+
+      final userData = await remoteDataSource.findUserByEmail(identifier.trim().toLowerCase());
+      final resolvedUserId = userData?['uid'] ?? identifier;
+      final existing = members.firstWhereOrNull((m) => m.userId == resolvedUserId);
+      if (existing != null) {
+        throw Exception(existing.invitationStatus == 'pending'
+            ? 'Invitation already pending'
+            : 'User already in group');
       }
       final newMember = MemberEntity(
         groupId: groupId,
@@ -321,14 +250,12 @@ class GroupsController extends GetxController {
         isAppUser: userData != null,
         firestoreId: '',
       );
-      debugPrint("📨 Creating PENDING invitation...");
-      await addMemberUseCase.call(groupId, newMember);
+      await addMemberUseCase(groupId, newMember);
       await loadMembers(groupId);
-      _showSuccessSnackbar("Invitation sent successfully");
+      ErrorHandler.showSuccess('Invitation Sent', 'Invitation sent successfully');
     } catch (e, stack) {
-      debugPrint(" ERROR: $e");
-      debugPrint("STACK: $stack");
-      _showErrorSnackbar("Failed to add member", e.toString());
+      AppLogger.e('addMemberToGroup error', e, stack);
+      ErrorHandler.handleError('Failed to add member', ErrorHandler.getUserFriendlyException(e));
     } finally {
       isLoading.value = false;
     }
@@ -337,149 +264,87 @@ class GroupsController extends GetxController {
   Future<void> removeMemberFromGroup(String groupId, String userId) async {
     try {
       isLoading.value = true;
-      if (groupId.isEmpty || userId.isEmpty)
-        throw Exception("Invalid group or user ID");
       await remoteDataSource.removeMember(groupId, userId);
       members.removeWhere((m) => m.userId == userId);
-      _showSuccessSnackbar("Member removed successfully");
-    } catch (e) {
-      print("Error removing member: $e");
-      _showErrorSnackbar("Failed to remove member", e.toString());
-    } finally {
-      if (!_isDisposed) isLoading.value = false;
-    }
-  }
-
-  Future<void> addSelectedMembers(
-    List<Map<String, dynamic>> selectedUsers,
-  ) async {
-    try {
-      final currentGroupId = groupId.value;
-      if (currentGroupId.isEmpty) {
-        _showErrorSnackbar("Error", "Group not found");
-        return;
-      }
-      isLoading.value = true;
-      await loadMembers(currentGroupId);
-      int addedCount = 0;
-      int skippedCount = 0;
-      for (final user in selectedUsers) {
-        final uid = user['uid']?.toString().trim() ?? '';
-        final name = user['name']?.toString().trim() ?? 'Unknown';
-        final phone = _normalizePhone(user['phone']?.toString() ?? '');
-        final email = user['email']?.toString().trim().toLowerCase() ?? '';
-        final alreadyExists = members.any((m) {
-          final memberId = m.userId.toString().trim();
-          final memberName = m.name.toString().trim();
-          final memberPhone = _normalizePhone(m.userId);
-          final memberEmail = m.userId.toString().trim().toLowerCase();
-          return (uid.isNotEmpty && memberId == uid) ||
-              (phone.isNotEmpty && memberPhone == phone) ||
-              (email.isNotEmpty && memberEmail == email) ||
-              memberName == name;
-        });
-        if (alreadyExists) {
-          skippedCount++;
-          continue;
-        }
-        final newMember = MemberEntity(
-          groupId: currentGroupId,
-          userId: uid.isNotEmpty ? uid : phone,
-          name: name,
-          role: 'member',
-          invitationStatus: 'accepted',
-          joinedAt: DateTime.now(),
-          invitedBy: currentUserId,
-          isAppUser: user['isAppUser'] ?? false,
-          firestoreId: '',
-        );
-        await addMemberUseCase.call(currentGroupId, newMember);
-        addedCount++;
-      }
-      await loadMembers(currentGroupId);
-      Get.back();
-      _showSuccessSnackbar(
-        "$addedCount added, $skippedCount duplicate skipped",
-      );
-    } catch (e) {
-      _showErrorSnackbar("Error", e.toString());
+      ErrorHandler.showSuccess('Removed', 'Member removed successfully');
+    } catch (e, stack) {
+      AppLogger.e('removeMemberFromGroup error', e, stack);
+      ErrorHandler.handleError('Failed to remove member', ErrorHandler.getUserFriendlyException(e));
     } finally {
       isLoading.value = false;
     }
   }
 
-  String _normalizePhone(dynamic value) {
-    String phone = value.toString();
-    phone = phone.replaceAll(" ", "");
-    phone = phone.replaceAll("-", "");
-    phone = phone.replaceAll("(", "");
-    phone = phone.replaceAll(")", "");
-    if (phone.startsWith("+93")) {
-      phone = "0${phone.substring(3)}";
-    }
-    return phone.trim();
-  }
-
-  Future<void> updateMemberStatus(
-    String groupId,
-    String userId,
-    String status,
-  ) async {
+  // Fixed: Actually updates status in backend
+  Future<void> updateMemberStatusLocally(String groupId, String userId, String status) async {
     try {
       isLoading.value = true;
-      if (groupId.isEmpty || userId.isEmpty || status.isEmpty) {
-        throw Exception("Invalid parameters");
-      }
-      final memberIndex = members.indexWhere(
-        (m) => m.userId == userId && m.groupId == groupId,
-      );
-      if (memberIndex == -1) throw Exception("Member not found");
-      final member = members[memberIndex];
-      final updatedMember = MemberEntity(
-        groupId: member.groupId,
-        userId: member.userId,
-        name: member.name,
-        role: member.role,
-        joinedAt: member.joinedAt,
-        invitationStatus: status,
-        invitedBy: member.invitedBy,
-        isAppUser: member.isAppUser,
-        firestoreId: member.firestoreId,
-      );
-      members[memberIndex] = updatedMember;
-      _showSuccessSnackbar("Status updated to: $status");
-    } catch (e) {
-      print("Error updating member status: $e");
-      _showErrorSnackbar("Failed to update status", e.toString());
+      await updateMemberStatusUseCase(groupId, userId, status);
+      // Refresh members to get updated status
+      await loadMembers(groupId);
+      ErrorHandler.showSuccess('Status Updated', 'Member status changed to $status');
+    } catch (e, stack) {
+      AppLogger.e('updateMemberStatus error', e, stack);
+      ErrorHandler.handleError('Update Failed', ErrorHandler.getUserFriendlyException(e));
     } finally {
-      if (!_isDisposed) isLoading.value = false;
+      isLoading.value = false;
     }
   }
 
-  Future<void> acceptGroupInvitation({
-    required String groupId,
-    required String userId,
-  }) async {
+  Future<void> acceptGroupInvitation({required String groupId, required String userId}) async {
+    await updateMemberStatusLocally(groupId, userId, 'accepted');
+  }
+
+  Future<void> addSelectedMembers(List<Map<String, dynamic>> selectedUsers) async {
+    final currentGroupId = currentGroup.value?.id;
+    if (currentGroupId == null || currentGroupId.isEmpty) {
+      ErrorHandler.handleError('Error', 'Group not found');
+      return;
+    }
     try {
-      await updateMemberStatus(groupId, userId, 'accepted');
-    } catch (e) {
-      _showErrorSnackbar("Failed to accept invitation", e.toString());
+      isLoading.value = true;
+      await loadMembers(currentGroupId);
+      int added = 0;
+      for (final user in selectedUsers) {
+        final uid = user['uid']?.toString().trim() ?? '';
+        final name = user['name']?.toString().trim() ?? 'Unknown';
+        final alreadyExists = members.any((m) => m.userId == uid || m.name == name);
+        if (alreadyExists) continue;
+        final newMember = MemberEntity(
+          groupId: currentGroupId,
+          userId: uid.isNotEmpty ? uid : name, // fallback
+          name: name,
+          role: 'member',
+          invitationStatus: 'accepted', // V1: add as accepted directly
+          joinedAt: DateTime.now(),
+          invitedBy: currentUserId,
+          isAppUser: user['isAppUser'] ?? false,
+          firestoreId: '',
+        );
+        await addMemberUseCase(currentGroupId, newMember);
+        added++;
+      }
+      await loadMembers(currentGroupId);
+      Get.back(); // pop select members screen
+      ErrorHandler.showSuccess('Members Added', '$added member(s) added');
+    } catch (e, stack) {
+      AppLogger.e('addSelectedMembers error', e, stack);
+      ErrorHandler.handleError('Error', ErrorHandler.getUserFriendlyException(e));
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  // ------------------------------------------------------------
-  // USER SEARCH
-  // ------------------------------------------------------------
-
+  // ============================================================
+  // User search
+  // ============================================================
   void onSearchChanged(String query) {
     _debounce?.cancel();
     if (query.isEmpty) {
       searchResults.clear();
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 400), () {
-      if (!_isDisposed) searchUsers(query);
-    });
+    _debounce = Timer(const Duration(milliseconds: 400), () => searchUsers(query));
   }
 
   Future<void> searchUsers(String query) async {
@@ -490,210 +355,115 @@ class GroupsController extends GetxController {
     try {
       isSearching.value = true;
       searchError.value = '';
-      final results = await searchUsersUseCase.call(query.trim());
-      if (!_isDisposed) searchResults.assignAll(results);
-    } catch (e) {
-      print("Search Error: $e");
-      if (!_isDisposed) {
-        searchError.value = "Search failed: ${e.toString()}";
-        searchResults.clear();
-      }
-      if (e.toString().contains("timeout")) {
-        _showErrorSnackbar("Search timed out", "Please try again");
-      } else if (e.toString().contains("internet")) {
-        _showErrorSnackbar("No internet", "Check your connection");
-      }
+      final results = await searchUsersUseCase(query.trim());
+      searchResults.assignAll(results);
+    } catch (e, stack) {
+      AppLogger.e('searchUsers error', e, stack);
+      searchError.value = ErrorHandler.getUserFriendlyException(e);
+      searchResults.clear();
     } finally {
-      if (!_isDisposed) isSearching.value = false;
+      isSearching.value = false;
     }
   }
 
   Future<void> fetchPhoneContacts() async {
+    if (!_networkService.isOnline) {
+      ErrorHandler.showInfo('Offline', 'Cannot load contacts without internet.');
+      return;
+    }
+
     try {
-      final status = await FlutterContacts.permissions.request(
-        PermissionType.readWrite,
+      final status = await fc.FlutterContacts.permissions.request(
+        fc.PermissionType.readWrite,
       );
-      if (status != PermissionStatus.granted) {
-        _showErrorSnackbar("Permission denied", "Cannot access contacts");
+      if (status != fc.PermissionStatus.granted) {
+        ErrorHandler.handlePermissionError('contacts');
         return;
       }
-      final fetchedContacts = await FlutterContacts.getAll();
-      if (!_isDisposed) contacts.assignAll(fetchedContacts);
-    } catch (e) {
-      print("Error fetching contacts: $e");
-      _showErrorSnackbar("Failed to load contacts", e.toString());
+
+      // دریافت مخاطبین با شماره تلفن (برای V1 کافی است)
+      final fetchedContacts = await fc.FlutterContacts.getAll(
+        properties: {fc.ContactProperty.phone},
+      );
+      contacts.assignAll(fetchedContacts);
+      AppLogger.i('Loaded ${fetchedContacts.length} contacts with phone numbers');
+    } catch (e, stack) {
+      AppLogger.e('Failed to fetch phone contacts', e, stack);
+      ErrorHandler.handleError(
+        'Contacts Error',
+        ErrorHandler.getUserFriendlyException(e),
+      );
     }
   }
 
-  // ------------------------------------------------------------
-  // NEW METHODS FOR GroupDetailScreen
-  // ------------------------------------------------------------
-
-  Future<void> loadGroupAndMembers(
-    String groupId, {
-    bool forceRefresh = false,
-  }) async {
-    if (!_isOnline.value && !forceRefresh) {
-      _showErrorSnackbar("Offline", "Cannot refresh. Connect to internet.");
+  // ============================================================
+  // Group detail screen helpers
+  // ============================================================
+  Future<void> loadGroupAndMembers(String groupId, {bool forceRefresh = false}) async {
+    if (!_networkService.isOnline && !forceRefresh) {
+      ErrorHandler.showInfo('Offline', 'Cannot refresh. Connect to internet.');
       return;
     }
     final group = allGroups.firstWhereOrNull((g) => g.id == groupId);
     if (group != null) currentGroup.value = group;
     await loadMembers(groupId);
-    watchGroupBalance(groupId);
+    _watchGroupBalance(groupId);
   }
 
-  void showEditGroupNameDialog(BuildContext context, GroupEntity group) {
-    final controller = TextEditingController(text: group.name);
-    Get.defaultDialog(
-      title: "Edit Group Name",
-      content: TextField(
-        controller: controller,
-        decoration: const InputDecoration(hintText: "Enter new name"),
-      ),
-      confirm: ElevatedButton(
-        onPressed: () async {
-          final newName = controller.text.trim();
-          if (newName.isNotEmpty && newName != group.name) {
-            final updatedGroup = (group as GroupModel).copyWith(name: newName);
-            await updateGroupDetails(updatedGroup);
-          }
-          Get.back();
-        },
-        child: const Text("Save"),
-      ),
-      cancel: TextButton(
-        onPressed: () => Get.back(),
-        child: const Text("Cancel"),
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------
-  // DELETE GROUP DIALOG - FULLY FIXED
-  // ------------------------------------------------------------
-  void showDeleteGroupDialog(BuildContext context, String groupId) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Delete Group"),
-        content: const Text(
-          "Are you sure you want to delete this group? This action cannot be undone.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await Future.delayed(
-                Duration.zero,
-              ); // یا await WidgetsBinding.instance.endOfFrame
-              await deleteSelectedGroup(groupId);
-            },
-            child: const Text("Delete"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------
-  // REMOVE MEMBER DIALOG - FULLY FIXED
-  // ------------------------------------------------------------
-  void showRemoveMemberDialog(
-    BuildContext context,
-    String groupId,
-    MemberEntity member,
-  ) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Remove Member"),
-        content: Text("Remove ${member.name} from the group?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await Future.delayed(Duration.zero);
-              await removeMemberFromGroup(groupId, member.userId);
-            },
-            child: const Text("Remove"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void watchGroupBalance(String groupId) {
+  void _watchGroupBalance(String groupId) {
     _expenseSubscription?.cancel();
     _expenseSubscription = FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
         .collection('expenses')
+        .where('isDeleted', isEqualTo: false)
         .snapshots()
         .listen((snapshot) {
-          double total = 0;
-          for (var doc in snapshot.docs) {
-            final data = doc.data();
-            total += (data['amount'] ?? 0).toDouble();
-          }
-          balanceText.value = total.toStringAsFixed(0);
-        });
+      double total = 0;
+      for (var doc in snapshot.docs) {
+        total += (doc.data()['amount'] ?? 0).toDouble();
+      }
+      balanceText.value = total.toStringAsFixed(0);
+    }, onError: (e) {
+      AppLogger.e('Balance stream error', e);
+    });
   }
 
   void goToAddMembers() {
     final groupId = currentGroup.value?.id;
     if (groupId == null || groupId.isEmpty) {
-      _showErrorSnackbar("Error", "Group ID is null");
+      ErrorHandler.handleError('Error', 'Group ID is null');
       return;
     }
-    debugPrint("🚀 Navigating to SelectMembersScreen with groupId: $groupId");
     Get.toNamed('/select-members', arguments: {'groupId': groupId});
   }
 
-  // FIXED: Upload image and update currentGroup & allGroups
+  // Image upload
   Future<String?> uploadGroupImage(File imageFile, String groupId) async {
     try {
-      if (!_isOnline.value) throw Exception("No internet connection");
-      final ref = FirebaseStorage.instance.ref().child(
-        'group_images/$groupId.jpg',
-      );
+      if (!_networkService.isOnline) throw Exception('No internet connection');
+      isLoadingImage.value = true;
+      final ref = FirebaseStorage.instance.ref().child('group_images/$groupId.jpg');
       await ref.putFile(imageFile);
       final url = await ref.getDownloadURL();
       await remoteDataSource.updateGroupCover(groupId, url);
-
-      // Update currentGroup if it belongs to this group
+      // Update local state
       if (currentGroup.value?.id == groupId) {
-        final updatedGroup = (currentGroup.value as GroupModel).copyWith(
-          coverImageUrl: url,
-        );
-        currentGroup.value = updatedGroup;
-        // Also update in allGroups
+        final updated = (currentGroup.value as GroupModel).copyWith(coverImageUrl: url);
+        currentGroup.value = updated;
         final index = allGroups.indexWhere((g) => g.id == groupId);
-        if (index != -1) {
-          allGroups[index] = updatedGroup as GroupModel;
-        }
+        if (index != -1) allGroups[index] = updated as GroupModel;
         final groupIndex = groups.indexWhere((g) => g.id == groupId);
-        if (groupIndex != -1) {
-          groups[groupIndex] = updatedGroup;
-        }
+        if (groupIndex != -1) groups[groupIndex] = updated;
       }
+      ErrorHandler.showSuccess('Uploaded', 'Group image updated');
       return url;
-    } catch (e) {
-      print("Upload error: $e");
-      _showErrorSnackbar("Upload Failed", e.toString());
+    } catch (e, stack) {
+      AppLogger.e('uploadGroupImage error', e, stack);
+      ErrorHandler.handleError('Upload Failed', ErrorHandler.getUserFriendlyException(e));
       return null;
+    } finally {
+      isLoadingImage.value = false;
     }
   }
 
@@ -705,35 +475,25 @@ class GroupsController extends GetxController {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: const Text("Take Photo"),
+              title: const Text('Take Photo'),
               onTap: () async {
                 Navigator.pop(ctx);
                 final picker = ImagePicker();
-                final picked = await picker.pickImage(
-                  source: ImageSource.camera,
-                );
+                final picked = await picker.pickImage(source: ImageSource.camera);
                 if (picked != null) {
-                  groupImageFile.value = File(picked.path);
                   await uploadGroupImage(File(picked.path), group.id);
-                  groupImageFile.value = null; // clear temporary file
-                  await loadGroupAndMembers(group.id, forceRefresh: true);
                 }
               },
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text("Choose from Gallery"),
+              title: const Text('Choose from Gallery'),
               onTap: () async {
                 Navigator.pop(ctx);
                 final picker = ImagePicker();
-                final picked = await picker.pickImage(
-                  source: ImageSource.gallery,
-                );
+                final picked = await picker.pickImage(source: ImageSource.gallery);
                 if (picked != null) {
-                  groupImageFile.value = File(picked.path);
                   await uploadGroupImage(File(picked.path), group.id);
-                  groupImageFile.value = null;
-                  await loadGroupAndMembers(group.id, forceRefresh: true);
                 }
               },
             ),
@@ -743,30 +503,76 @@ class GroupsController extends GetxController {
     );
   }
 
-  // ------------------------------------------------------------
-  // SNACKBAR HELPERS
-  // ------------------------------------------------------------
-  void _showSuccessSnackbar(String message) {
-    if (_isDisposed) return;
-    Get.snackbar(
-      'Success',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 2),
+  // ============================================================
+  // Dialogs (keep UI unchanged, just reusing error handling)
+  // ============================================================
+  void showEditGroupNameDialog(BuildContext context, GroupEntity group) {
+    final controller = TextEditingController(text: group.name);
+    Get.defaultDialog(
+      title: 'Edit Group Name',
+      content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Enter new name')),
+      confirm: ElevatedButton(
+        onPressed: () async {
+          final newName = controller.text.trim();
+          if (newName.isNotEmpty && newName != group.name) {
+            final updatedGroup = (group as GroupModel).copyWith(name: newName);
+            await updateGroupDetails(updatedGroup);
+          }
+          Get.back();
+        },
+        child: const Text('Save'),
+      ),
+      cancel: TextButton(onPressed: Get.back, child: const Text('Cancel')),
     );
   }
 
-  void _showErrorSnackbar(String title, String message) {
-    if (_isDisposed) return;
-    Get.snackbar(
-      title,
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 3),
+  void showDeleteGroupDialog(BuildContext context, String groupId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Group'),
+        content: const Text('Are you sure? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await deleteSelectedGroup(groupId);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
+  }
+
+  void showRemoveMemberDialog(BuildContext context, String groupId, MemberEntity member) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Member'),
+        content: Text('Remove ${member.name} from the group?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await removeMemberFromGroup(groupId, member.userId);
+            },
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool canRemoveMember(MemberEntity member) {
+    final currentUser = members.firstWhereOrNull((m) => m.userId == currentUserId);
+    if (currentUser == null) return false;
+    return currentUser.role == 'admin' && member.userId != currentUserId;
   }
 }

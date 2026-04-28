@@ -2,12 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:roomly/features/auth/data/repository/authentication_repository.dart';
-import 'package:roomly/features/groups/domain/entities/group.dart';
-import 'package:roomly/features/groups/domain/entities/group_setting.dart';
-import 'package:roomly/features/groups/presentation/pages/select_member_screen.dart';
-import '../../data/models/member_model.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/util/app_logger.dart';
+import '../../../../core/util/error_handler.dart';
+import '../../../auth/data/repository/authentication_repository.dart';
+import '../../domain/entities/group.dart';
+import '../../domain/entities/group_setting.dart';
 import '../controller/group_controller.dart';
+import 'select_member_screen.dart';
 import 'groups_details_page.dart';
 
 class CreateNewGroupScreen extends StatefulWidget {
@@ -43,7 +46,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
   File? _selectedImage;
   bool _isCreating = false;
 
-  List<MemberModel> members = [];
+  List<Map<String, dynamic>> _selectedMembers = [];
 
   @override
   void initState() {
@@ -63,7 +66,6 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
   Future<void> _pickImage({required ImageSource source}) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: source, imageQuality: 85);
-
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
@@ -81,7 +83,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
               leading: const Icon(Icons.photo_camera),
               title: const Text("Take Photo"),
               onTap: () {
-                Navigator.of(context).pop();
+                Navigator.pop(context);
                 _pickImage(source: ImageSource.camera);
               },
             ),
@@ -89,7 +91,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
               leading: const Icon(Icons.photo_library),
               title: const Text("Choose from Gallery"),
               onTap: () {
-                Navigator.of(context).pop();
+                Navigator.pop(context);
                 _pickImage(source: ImageSource.gallery);
               },
             ),
@@ -103,100 +105,111 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     final name = _memberController.text.trim();
     if (name.isEmpty) return;
 
-    final exists = members.any((m) => m.name == name);
+    final exists = _selectedMembers.any((m) => m['name'] == name);
     if (exists) {
-      Get.snackbar("Warning", "Member already added");
+      ErrorHandler.showInfo('Warning', 'Member already added');
       return;
     }
 
     setState(() {
-      members.add(MemberModel(
-        name: name,
-        userId:DateTime.now().toString(),
-        firestoreId: '',
-        groupId: '',
-        role: '',
-        joinedAt:DateTime.now(),
-        invitationStatus: '',
-      ));
+      _selectedMembers.add({
+        'uid': DateTime.now().millisecondsSinceEpoch.toString(),
+        'name': name,
+        'isAppUser': false,
+        'avatar': 'https://ui-avatars.com/api/?name=$name',
+      });
     });
-
     _memberController.clear();
   }
 
-  void _openContactsPicker() async {
-    final result = await Get.to(() => const SelectMembersScreen());
+  Future<void> _openContactsPicker() async {
+    try {
+      final result = await Get.to<List<Map<String, dynamic>>>(
+            () => const SelectMembersScreen(),
+      );
 
-    if (result != null && result is List) {
+      if (result == null) return;
+      if (result.isEmpty) {
+        ErrorHandler.showInfo('No Selection', 'No members were selected');
+        return;
+      }
+
+      int addedCount = 0;
       setState(() {
-        for (var m in result) {
-          if (!members.any((old) => old.userId == m['uid'])) {
-            members.add(
-              MemberModel(
-                firestoreId: '',
-                groupId: '',
-                userId: m['uid'],
-                name: m['name'] ?? '',
-                role: 'member',
-                joinedAt: DateTime.now(),
-                invitationStatus: 'pending',
-                isAppUser: true,
-              ),
-            );
+        for (final member in result) {
+          final exists = _selectedMembers.any((m) => m['uid'] == member['uid']);
+          if (!exists) {
+            _selectedMembers.add(member);
+            addedCount++;
           }
         }
       });
+
+      if (addedCount > 0) {
+        ErrorHandler.showSuccess('Members Added', '$addedCount member(s) selected');
+      } else {
+        ErrorHandler.showInfo('Duplicate Members', 'Selected members already added');
+      }
+    } catch (e, stack) {
+      AppLogger.e('Open contacts picker failed', e, stack);
+      ErrorHandler.handleError('Selection Failed', 'Could not load contacts');
+    }
+  }
+
+  void _removeSelectedMember(int index) {
+    setState(() {
+      _selectedMembers.removeAt(index);
+    });
+  }
+
+  Future<String?> _uploadGroupImage(File imageFile, String groupId) async {
+    try {
+      final storageRef = FirebaseStorage.instance.ref();
+      final imageRef = storageRef.child('group_images/$groupId.jpg');
+      // آپلود فایل
+      await imageRef.putFile(imageFile);
+      // دریافت URL
+      final downloadUrl = await imageRef.getDownloadURL();
+      AppLogger.i('Group image uploaded successfully: $downloadUrl');
+      return downloadUrl;
+    } catch (e, stack) {
+      AppLogger.e('Upload failed for group $groupId', e, stack);
+      ErrorHandler.handleError(
+        'Upload Failed',
+        'Could not upload group image. Group created without image.',
+      );
+      return null;
     }
   }
 
   Future<void> _createGroup() async {
     final groupName = _nameController.text.trim();
     if (groupName.isEmpty) {
-      Get.snackbar(
-        'Error',
-        'Please enter a group name',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      ErrorHandler.handleValidationError('Please enter a group name');
       return;
     }
 
     final authRepo = Get.find<AuthenticationRepository>();
     final firebaseUser = authRepo.firebaseUser.value;
     if (firebaseUser == null) {
-      Get.snackbar('Error', 'User not authenticated');
+      ErrorHandler.handleAuthError('User not authenticated');
       return;
     }
 
     final uid = firebaseUser.uid;
     final userName = firebaseUser.displayName ?? 'You';
+    final userPhoto = firebaseUser.photoURL ?? '';
 
     setState(() => _isCreating = true);
 
     try {
-      // Ensure the creator is added as admin if not already in the list
-      if (!members.any((m) => m.userId == uid)) {
-        members.insert(
-          0,
-          MemberModel(
-            name: userName,
-            userId: uid,
-            firestoreId: '',
-            groupId: '',
-            role: 'admin',
-            joinedAt: DateTime.now(),
-            invitationStatus: 'accepted',
-            isAppUser: true,
-          ),
-        );
-      }
-
-      // Build the group entity
+      // 1. ایجاد سند گروه (بدون عکس و بدون اعضا)
       final newGroup = GroupEntity(
         id: '',
         name: groupName,
-        membersCount: members.length,
+        membersCount: _selectedMembers.length + 1, // +1 برای سازنده
         description: _selectedCategory,
-        coverImageUrl: '', // Will be updated after upload
+        coverImageUrl: '',
         currency: _selectedCurrency.split(' ')[0],
         createdBy: uid,
         isArchived: false,
@@ -209,36 +222,69 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
         ),
       );
 
-      // Create group (with optional image upload)
       final groupId = await controller.createNewGroup(
         newGroup,
-        imageFile: _selectedImage, // Pass the selected image file (can be null)
+        imageFile: null,
       );
-      if (groupId == null) throw Exception('Group creation failed');
 
-      // Add all members to the newly created group
-      for (var member in members) {
-        final identifier = member.userId.isNotEmpty ? member.userId : member.userId;
-        final name = member.name;
-        if (identifier.isNotEmpty && name.isNotEmpty) {
-          await controller.addMemberToGroup(groupId, identifier, name);
-        }
+      if (groupId == null || groupId.isEmpty) {
+        throw Exception('Group creation failed - no ID returned');
       }
 
+      AppLogger.i('Group document created with ID: $groupId');
+
+      // 2. آپلود عکس (در صورت وجود)
+      String? photoUrl;
+      if (_selectedImage != null) {
+        photoUrl = await _uploadGroupImage(_selectedImage!, groupId);
+      }
+
+      // 3. ساخت لیست نهایی اعضا (شامل سازنده و اعضای انتخاب‌شده، بدون تکرار)
+      final List<Map<String, dynamic>> allMembers = [];
+
+      // اضافه کردن سازنده
+      allMembers.add({
+        'uid': uid,
+        'name': userName,
+        'avatar': userPhoto,
+        'isAppUser': true,
+        'addedAt': Timestamp.now(),  // اصلاح: استفاده از Timestamp.now()
+      });
+
+      // اضافه کردن اعضای انتخاب شده
+      for (var member in _selectedMembers) {
+        if (member['uid'] == uid) continue; // جلوگیری از تکرار سازنده
+        allMembers.add({
+          'uid': member['uid'],
+          'name': member['name'],
+          'avatar': member['avatar'] ?? '',
+          'phone': member['phone'] ?? '',
+          'isAppUser': member['isAppUser'] ?? false,
+          'addedAt': Timestamp.now(),
+        });
+      }
+
+      // 4. به‌روزرسانی سند گروه با اعضا، تعداد، status و عکس
+      final groupRef = FirebaseFirestore.instance.collection('groups').doc(groupId);
+      final updateData = {
+        'members': allMembers,
+        'membersCount': allMembers.length,
+        'status': 'active',
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (photoUrl != null && photoUrl.isNotEmpty) {
+        updateData['coverImageUrl'] = photoUrl;
+      }
+      await groupRef.update(updateData);
+      AppLogger.i('Group updated with ${allMembers.length} members and image');
+
+      ErrorHandler.showSuccess('Success', 'Group created successfully');
       if (!mounted) return;
-      // Navigate to the group detail screen and remove the creation screen from stack
       Get.off(() => GroupDetailScreen(groupId: groupId));
-    } catch (e) {
-      // Show user-friendly error message
-      Get.snackbar(
-        'Creation Failed',
-        e.toString().contains('internet') || e.toString().contains('Network')
-            ? 'No internet connection. Please try again.'
-            : e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+    } catch (e, stack) {
+      AppLogger.e('Group creation failed', e, stack);
+      final message = ErrorHandler.getUserFriendlyException(e);
+      ErrorHandler.handleError('Creation Failed', message);
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
@@ -386,7 +432,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Colors.white
-                      : Colors.white.withValues(alpha:  0.5),
+                      : Colors.white.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected
@@ -489,14 +535,14 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
           onSubmitted: (_) => _addMemberManual(),
         ),
         const SizedBox(height: 16),
-        if (members.isNotEmpty)
+        if (_selectedMembers.isNotEmpty)
           SizedBox(
             height: 100,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: members.length,
+              itemCount: _selectedMembers.length,
               itemBuilder: (context, index) {
-                final m = members[index];
+                final member = _selectedMembers[index];
                 return Padding(
                   padding: const EdgeInsets.only(right: 15),
                   child: Column(
@@ -506,11 +552,15 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
                         children: [
                           CircleAvatar(
                             radius: 28,
-                            // backgroundImage: NetworkImage(),
+                            backgroundImage: member['avatar'] != null
+                                ? NetworkImage(member['avatar'])
+                                : null,
+                            child: member['avatar'] == null
+                                ? Text(member['name'][0].toUpperCase())
+                                : null,
                           ),
                           GestureDetector(
-                            onTap: () =>
-                                setState(() => members.removeAt(index)),
+                            onTap: () => _removeSelectedMember(index),
                             child: Container(
                               padding: const EdgeInsets.all(2),
                               decoration: const BoxDecoration(
@@ -527,7 +577,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(m.name, style: const TextStyle(fontSize: 10)),
+                      Text(member['name'], style: const TextStyle(fontSize: 10)),
                     ],
                   ),
                 );

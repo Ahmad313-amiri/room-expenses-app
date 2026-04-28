@@ -6,6 +6,6 @@ class DeleteGroup {
   DeleteGroup(this.repository);
 
   Future<void> call(String groupId) async {
-    return repository.archiveGroup(groupId);
+    return repository.deleteGroup(groupId);
   }
 }

@@ -7,7 +7,6 @@ import '../../../../core/util/net_work.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
 import '../../data/data_sources/settelment_remote_datasource.dart';
 
-
 class AdvancedSettleUpScreen extends StatefulWidget {
   final String groupId;
   const AdvancedSettleUpScreen({super.key, required this.groupId});
@@ -40,7 +39,11 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
     _settlementDataSource = SettlementRemoteDataSource();
     _networkService = Get.find<NetworkService>();
     _groupsController = Get.find<GroupsController>();
-    _fetchMembers();
+
+    // فراخوانی بارگذاری اعضا بعد از اولین فریم (جلوگیری از setState در حین build)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchMembers();
+    });
   }
 
   @override
@@ -64,8 +67,8 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
     });
 
     try {
-      // استفاده از کنترلر گروه برای دریافت اعضا (که قبلاً بازنویسی شده و از ErrorHandler استفاده می‌کند)
-      await _groupsController.loadMembers(widget.groupId);
+      // استفاده از متد بارگذاری با غیرفعال کردن نمایش Snackbar
+      await _groupsController.loadMembers(widget.groupId, showErrorSnackbar: false);
       final memberEntities = _groupsController.members;
       members = memberEntities.map((m) {
         return {
@@ -123,10 +126,8 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
       await _settlementDataSource.saveSettlement(widget.groupId, data);
       AppLogger.i('Settlement saved in group ${widget.groupId}');
 
-      // نمایش پیام موفقیت
       if (mounted) {
         ErrorHandler.showSuccess('Success', 'Settlement recorded successfully');
-        // برگشت به صفحه گروه (صفحه جزئیات گروه)
         Get.back(result: true);
       }
     } catch (e, stack) {
@@ -174,7 +175,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // نمایش وضعیت بارگذاری اعضا
             if (isMembersLoading)
               const Center(child: CircularProgressIndicator())
             else if (membersError.isNotEmpty)
@@ -193,7 +193,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
                 ),
               )
             else ...[
-                // انتخاب پرداخت‌کننده
                 DropdownButtonFormField<String>(
                   value: selectedPayer,
                   hint: const Text("Select Payer"),
@@ -211,7 +210,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
                   onChanged: (val) => setState(() => selectedPayer = val),
                 ),
                 const SizedBox(height: 12),
-                // انتخاب گیرنده
                 DropdownButtonFormField<String>(
                   value: selectedReceiver,
                   hint: const Text("Select Receiver"),
@@ -229,7 +227,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
                   onChanged: (val) => setState(() => selectedReceiver = val),
                 ),
                 const SizedBox(height: 24),
-                // مبلغ
                 const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 TextField(
@@ -251,7 +248,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // روش پرداخت و تاریخ در یک ردیف
                 Row(
                   children: [
                     Expanded(
@@ -315,7 +311,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // تأیید پرداخت واقعی
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -339,7 +334,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                // دکمه ثبت
                 SizedBox(
                   width: double.infinity,
                   height: 56,

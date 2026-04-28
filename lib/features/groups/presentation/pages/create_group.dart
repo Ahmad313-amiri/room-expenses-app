@@ -2,8 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/util/app_logger.dart';
 import '../../../../core/util/error_handler.dart';
 import '../../../auth/data/repository/authentication_repository.dart';
@@ -46,6 +44,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
   File? _selectedImage;
   bool _isCreating = false;
 
+  // Store selected members (as Map<String, dynamic> to be compatible with controller)
   List<Map<String, dynamic>> _selectedMembers = [];
 
   @override
@@ -105,6 +104,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     final name = _memberController.text.trim();
     if (name.isEmpty) return;
 
+    // Check duplicate by name
     final exists = _selectedMembers.any((m) => m['name'] == name);
     if (exists) {
       ErrorHandler.showInfo('Warning', 'Member already added');
@@ -123,36 +123,18 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
   }
 
   Future<void> _openContactsPicker() async {
-    try {
-      final result = await Get.to<List<Map<String, dynamic>>>(
-            () => const SelectMembersScreen(),
-      );
-
-      if (result == null) return;
-      if (result.isEmpty) {
-        ErrorHandler.showInfo('No Selection', 'No members were selected');
-        return;
-      }
-
-      int addedCount = 0;
+    // Navigate to SelectMembersScreen and wait for result
+    final result = await Get.to<List<Map<String, dynamic>>>(() => const SelectMembersScreen());
+    if (result != null && result.isNotEmpty) {
       setState(() {
-        for (final member in result) {
+        for (var member in result) {
           final exists = _selectedMembers.any((m) => m['uid'] == member['uid']);
           if (!exists) {
             _selectedMembers.add(member);
-            addedCount++;
           }
         }
       });
-
-      if (addedCount > 0) {
-        ErrorHandler.showSuccess('Members Added', '$addedCount member(s) selected');
-      } else {
-        ErrorHandler.showInfo('Duplicate Members', 'Selected members already added');
-      }
-    } catch (e, stack) {
-      AppLogger.e('Open contacts picker failed', e, stack);
-      ErrorHandler.handleError('Selection Failed', 'Could not load contacts');
+      ErrorHandler.showSuccess('Members Added', '${result.length} member(s) selected');
     }
   }
 
@@ -160,26 +142,6 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     setState(() {
       _selectedMembers.removeAt(index);
     });
-  }
-
-  Future<String?> _uploadGroupImage(File imageFile, String groupId) async {
-    try {
-      final storageRef = FirebaseStorage.instance.ref();
-      final imageRef = storageRef.child('group_images/$groupId.jpg');
-      // آپلود فایل
-      await imageRef.putFile(imageFile);
-      // دریافت URL
-      final downloadUrl = await imageRef.getDownloadURL();
-      AppLogger.i('Group image uploaded successfully: $downloadUrl');
-      return downloadUrl;
-    } catch (e, stack) {
-      AppLogger.e('Upload failed for group $groupId', e, stack);
-      ErrorHandler.handleError(
-        'Upload Failed',
-        'Could not upload group image. Group created without image.',
-      );
-      return null;
-    }
   }
 
   Future<void> _createGroup() async {
@@ -198,16 +160,15 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
 
     final uid = firebaseUser.uid;
     final userName = firebaseUser.displayName ?? 'You';
-    final userPhoto = firebaseUser.photoURL ?? '';
 
     setState(() => _isCreating = true);
 
     try {
-      // 1. ایجاد سند گروه (بدون عکس و بدون اعضا)
+      // Build group entity
       final newGroup = GroupEntity(
         id: '',
         name: groupName,
-        membersCount: _selectedMembers.length + 1, // +1 برای سازنده
+        membersCount: _selectedMembers.length + 1, // +1 for creator
         description: _selectedCategory,
         coverImageUrl: '',
         currency: _selectedCurrency.split(' ')[0],
@@ -222,64 +183,31 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
         ),
       );
 
+      // Create group (with optional image)
       final groupId = await controller.createNewGroup(
         newGroup,
-        imageFile: null,
+        imageFile: _selectedImage,
       );
 
-      if (groupId == null || groupId.isEmpty) {
-        throw Exception('Group creation failed - no ID returned');
-      }
+      if (groupId == null) throw Exception('Group creation failed');
 
-      AppLogger.i('Group document created with ID: $groupId');
-
-      // 2. آپلود عکس (در صورت وجود)
-      String? photoUrl;
-      if (_selectedImage != null) {
-        photoUrl = await _uploadGroupImage(_selectedImage!, groupId);
-      }
-
-      // 3. ساخت لیست نهایی اعضا (شامل سازنده و اعضای انتخاب‌شده، بدون تکرار)
-      final List<Map<String, dynamic>> allMembers = [];
-
-      // اضافه کردن سازنده
-      allMembers.add({
-        'uid': uid,
-        'name': userName,
-        'avatar': userPhoto,
-        'isAppUser': true,
-        'addedAt': Timestamp.now(),  // اصلاح: استفاده از Timestamp.now()
-      });
-
-      // اضافه کردن اعضای انتخاب شده
+      // Add all selected members
       for (var member in _selectedMembers) {
-        if (member['uid'] == uid) continue; // جلوگیری از تکرار سازنده
-        allMembers.add({
-          'uid': member['uid'],
-          'name': member['name'],
-          'avatar': member['avatar'] ?? '',
-          'phone': member['phone'] ?? '',
-          'isAppUser': member['isAppUser'] ?? false,
-          'addedAt': Timestamp.now(),
-        });
+        final identifier = member['uid'] ?? member['phone'] ?? '';
+        final name = member['name'] ?? '';
+        if (identifier.isNotEmpty && name.isNotEmpty) {
+          await controller.addMemberToGroup(groupId, identifier, name);
+        }
       }
 
-      // 4. به‌روزرسانی سند گروه با اعضا، تعداد، status و عکس
-      final groupRef = FirebaseFirestore.instance.collection('groups').doc(groupId);
-      final updateData = {
-        'members': allMembers,
-        'membersCount': allMembers.length,
-        'status': 'active',
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (photoUrl != null && photoUrl.isNotEmpty) {
-        updateData['coverImageUrl'] = photoUrl;
-      }
-      await groupRef.update(updateData);
-      AppLogger.i('Group updated with ${allMembers.length} members and image');
+      // Add creator as member (already done in repository, but ensure)
+      // Optionally, add creator to the list if not already there (but repository does it)
 
+      AppLogger.i('Group created successfully: $groupId');
       ErrorHandler.showSuccess('Success', 'Group created successfully');
+
       if (!mounted) return;
+      // Navigate to group detail screen and remove this screen from stack
       Get.off(() => GroupDetailScreen(groupId: groupId));
     } catch (e, stack) {
       AppLogger.e('Group creation failed', e, stack);

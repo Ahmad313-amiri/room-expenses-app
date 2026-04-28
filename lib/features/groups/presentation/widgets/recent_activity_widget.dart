@@ -20,15 +20,16 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
   @override
   void initState() {
     super.initState();
-    // Load activities for this group only
-    activityController.loadActivities(widget.groupId);
+    // بارگذاری فعالیت‌ها بعد از اولین فریم (جلوگیری از setState در حین build)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      activityController.loadActivities(widget.groupId);
+    });
     AppLogger.d('RecentActivityWidget initialized for group ${widget.groupId}');
   }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      // Loading state
       if (activityController.isLoading.value) {
         return const Padding(
           padding: EdgeInsets.all(20),
@@ -36,7 +37,6 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
         );
       }
 
-      // Error state
       if (activityController.errorMessage.isNotEmpty) {
         return Padding(
           padding: const EdgeInsets.all(20),
@@ -61,10 +61,8 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
         );
       }
 
-      // Take only first 3 activities
       final recentActivities = activityController.activities.take(3).toList();
 
-      // Build member name map from groupsController.members
       final Map<String, String> memberNames = {};
       for (var member in groupsController.members) {
         memberNames[member.userId] = member.name;
@@ -84,11 +82,9 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
-                // See All button (navigates to full activity screen)
                 if (activityController.activities.isNotEmpty)
                   TextButton(
                     onPressed: () {
-                      // Navigate to full activity screen
                       Get.toNamed('/activity', arguments: {'groupId': widget.groupId});
                     },
                     child: const Text('See All'),
@@ -157,7 +153,6 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
         ),
       );
     } else {
-      // Settlement activity
       final fromName = memberNames[activity.from] ?? activity.from ?? 'Someone';
       final toName = memberNames[activity.to] ?? activity.to ?? 'Someone';
       return Container(

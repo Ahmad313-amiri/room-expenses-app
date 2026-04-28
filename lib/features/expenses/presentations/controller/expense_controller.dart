@@ -16,12 +16,11 @@ class GroupExpenseSplitController extends GetxController {
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
 
-  // Reactive state
   var splitMethod = 'Equally'.obs;
   var participantIds = <String>[].obs;
   var customShares = <String, double>{}.obs;
   var selectedPayerId = ''.obs;
-  var isLoading = false.obs; // جدید: برای غیرفعال کردن دکمه در حین ذخیره
+  var isLoading = false.obs;
 
   late List<MemberEntity> members;
   late String groupId;
@@ -67,7 +66,9 @@ class GroupExpenseSplitController extends GetxController {
 
   bool get isSplitValid {
     final total = totalAmount;
-    return total > 0 && participantIds.isNotEmpty && (calculatedTotal - total).abs() < 0.01;
+    if (total <= 0) return false;
+    if (participantIds.isEmpty) return false;
+    return (calculatedTotal - total).abs() < 0.01;
   }
 
   void updateCustomSharesForMethod() {
@@ -92,7 +93,6 @@ class GroupExpenseSplitController extends GetxController {
   }
 
   Future<void> saveExpense() async {
-    // جلوگیری از چند بار کلیک
     if (isLoading.value) return;
 
     if (!isSplitValid) {
@@ -120,10 +120,8 @@ class GroupExpenseSplitController extends GetxController {
     final shares = calculateShares();
     final paidBy = <String, double>{selectedPayerId.value: amount};
 
-    // تولید ID به صورت خودکار – نیازی به دسترسی مستقیم به Firestore نیست
-    // استفاده‌کیس خودش ID را مدیریت می‌کند (در ExpenseRemoteDataSource)
     final expense = Expense(
-      id: '', // خالی بگذارید تا remote آن را تولید کند
+      id: '', // خالی – در data source ID جدید ساخته می‌شود
       amount: amount,
       description: description,
       date: DateTime.now(),
@@ -139,11 +137,7 @@ class GroupExpenseSplitController extends GetxController {
     try {
       await addExpenseUseCase(expense);
       AppLogger.i('Expense saved successfully in group $groupId');
-
-      // نمایش پیام موفقیت
       ErrorHandler.showSuccess('Success', 'Expense added successfully');
-
-      // برگشت به صفحه قبل (صفحه جزئیات گروه)
       Get.back(result: true);
     } catch (e, stack) {
       AppLogger.e('Failed to save expense', e, stack);

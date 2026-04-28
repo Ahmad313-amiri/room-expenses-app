@@ -5,7 +5,6 @@ import 'package:rxdart/rxdart.dart';
 import '../../../../core/util/app_logger.dart';
 import '../../../../core/util/error_handler.dart';
 import '../../../../core/util/net_work.dart';
-
 import '../../../auth/data/repository/authentication_repository.dart';
 import '../../data/models/activity_model.dart';
 import '../../domain/entity/activity.dart';
@@ -33,7 +32,6 @@ class ActivityController extends GetxController {
   }
 
   void _monitorConnectivity() {
-    // استفاده از NetworkService به جای connectivity_plus مستقیم
     ever(_networkService.isConnected, (connected) {
       if (!connected) {
         errorMessage.value = 'You are offline. Showing cached data.';
@@ -44,7 +42,6 @@ class ActivityController extends GetxController {
     });
   }
 
-  /// Load activities for a specific group (used in group detail screen)
   Future<void> loadActivities(String groupId) async {
     if (groupId.isEmpty) {
       isLoading.value = false;
@@ -62,40 +59,42 @@ class ActivityController extends GetxController {
 
     await _combinedSubscription?.cancel();
 
-    final expensesStream = _firestore
+    // استریم هزینه‌ها به صورت لیست Activity
+    Stream<List<Activity>> expensesStream = _firestore
         .collection('groups')
         .doc(groupId)
         .collection('expenses')
         .where('isDeleted', isEqualTo: false)
         .snapshots()
         .timeout(const Duration(seconds: 15))
-        .handleError((e) {
-      AppLogger.e('Expenses stream error', e);
-      return Stream.empty();
+        .map((snapshot) => snapshot.docs
+        .map((e) => ActivityModel.fromExpense(e).toEntity())
+        .toList())
+        .onErrorReturnWith((error, stackTrace) {
+      AppLogger.e('Expenses stream error (returning empty list)', error);
+      return <Activity>[];
     });
 
-    final settlementsStream = _firestore
+    // استریم تسویه‌ها به صورت لیست Activity
+    Stream<List<Activity>> settlementsStream = _firestore
         .collection('groups')
         .doc(groupId)
         .collection('settlements')
         .snapshots()
         .timeout(const Duration(seconds: 15))
-        .handleError((e) {
-      AppLogger.e('Settlements stream error', e);
-      return Stream.empty();
+        .map((snapshot) => snapshot.docs
+        .map((e) => ActivityModel.fromSettlement(e).toEntity())
+        .toList())
+        .onErrorReturnWith((error, stackTrace) {
+      AppLogger.e('Settlements stream error (returning empty list)', error);
+      return <Activity>[];
     });
 
     bool hasEmitted = false;
     _combinedSubscription = CombineLatestStream.combine2(
       expensesStream,
       settlementsStream,
-          (expenseSnap, settleSnap) {
-        final expenses = expenseSnap.docs
-            .map((e) => ActivityModel.fromExpense(e).toEntity())
-            .toList();
-        final settlements = settleSnap.docs
-            .map((e) => ActivityModel.fromSettlement(e).toEntity())
-            .toList();
+          (expenses, settlements) {
         final all = [...expenses, ...settlements];
         all.sort((a, b) => b.date.compareTo(a.date));
         return all;
@@ -112,7 +111,7 @@ class ActivityController extends GetxController {
       errorMessage.value = 'Error: ${ErrorHandler.getUserFriendlyException(error)}';
     });
 
-    // Timeout fallback
+    // Fallback: اگر ۳ ثانیه هیچ داده‌ای نیامد، لودینگ را تمام کن
     Future.delayed(const Duration(seconds: 3), () {
       if (!hasEmitted && isLoading.value == true) {
         isLoading.value = false;
@@ -123,7 +122,6 @@ class ActivityController extends GetxController {
     });
   }
 
-  /// Fetch all activities across all groups for home screen
   Future<void> fetchAllActivities({bool initialLoad = false}) async {
     if (!_networkService.isOnline) {
       if (!initialLoad) {
@@ -140,11 +138,9 @@ class ActivityController extends GetxController {
       final uid = currentUserId;
       if (uid == null) throw Exception('User not logged in');
 
-      // Get user's groups - but we don't want to depend on GroupsController
-      // Instead, fetch groups from Firestore directly
       final groupsSnapshot = await _firestore
           .collection('groups')
-          .where('members.$uid', isEqualTo: true) // requires member array field
+          .where('members.$uid', isEqualTo: true)
           .get()
           .timeout(const Duration(seconds: 10));
 
@@ -205,15 +201,12 @@ class ActivityController extends GetxController {
     }
   }
 
-  /// Efficient balance calculation using data already loaded in activities
   Future<void> _calculateBalancesEfficiently(List<Activity> allActivities, String uid) async {
     double youAreOwed = 0.0;
     double youOwe = 0.0;
 
     for (var activity in allActivities) {
       if (activity.type == ActivityType.expense) {
-        // For expenses, we need the split details. Instead of fetching each,
-        // we could store split data in ActivityModel. But for V1, fetch once.
         try {
           final doc = await _firestore
               .collection('groups')

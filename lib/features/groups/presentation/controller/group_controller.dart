@@ -208,7 +208,7 @@ class GroupsController extends GetxController {
   // ============================================================
   // Members management
   // ============================================================
-  Future<void> loadMembers(String groupId) async {
+  Future<void> loadMembers(String groupId, {bool showErrorSnackbar = true}) async {
     try {
       isLoading.value = true;
       final remoteMembers = await getMembersUseCase(groupId);
@@ -216,7 +216,10 @@ class GroupsController extends GetxController {
       AppLogger.i('Loaded ${remoteMembers.length} members');
     } catch (e, stack) {
       AppLogger.e('loadMembers error', e, stack);
-      ErrorHandler.handleError('Failed to load members', ErrorHandler.getUserFriendlyException(e));
+      if (showErrorSnackbar) {
+        ErrorHandler.handleError('Failed to load members', ErrorHandler.getUserFriendlyException(e));
+      }
+      rethrow;
     } finally {
       isLoading.value = false;
     }

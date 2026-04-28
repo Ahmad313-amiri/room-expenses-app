@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../../core/util/app_logger.dart';
-import '../../../../core/util/error_handler.dart';
 import '../../../activity/presentation/controller/activity_controller.dart';
 import '../controller/group_controller.dart';
 import '../widgets/group_actions.dart';
@@ -29,14 +27,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       Get.put(ActivityController());
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.loadGroupAndMembers(widget.groupId).catchError((e) {
-        ErrorHandler.handleError(
-          'Load Error',
-          ErrorHandler.getUserFriendlyException(e),
-        );
-      });
+      controller.loadGroupAndMembers(widget.groupId);
     });
-    AppLogger.i('GroupDetailScreen initialized for group ${widget.groupId}');
   }
 
   @override
@@ -65,9 +57,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.edit_note, color: Colors.grey, size: 20),
-                onPressed: group == null
-                    ? null
-                    : () => controller.showEditGroupNameDialog(context, group),
+                onPressed: group == null ? null : () => controller.showEditGroupNameDialog(context, group),
               ),
             ],
           );
@@ -88,24 +78,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           }
           final group = controller.currentGroup.value;
           if (group == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.group_off, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Group not found',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => Get.back(),
-                    child: const Text('Go Back'),
-                  ),
-                ],
-              ),
-            );
+            return const Center(child: Text("Group not found"));
           }
           return SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -120,9 +93,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  controller.groupImageFile.value == null
-                      ? 'Tap to add group photo'
-                      : 'Tap to change photo',
+                  controller.groupImageFile.value == null ? 'Tap to add group photo' : 'Tap to change photo',
                   style: const TextStyle(color: Colors.grey, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
@@ -136,8 +107,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 MembersListWidget(
                   members: controller.members,
                   canRemoveMember: controller.canRemoveMember,
-                  onRemoveMember: (member) =>
-                      controller.showRemoveMemberDialog(context, widget.groupId, member),
+                  onRemoveMember: (member) => controller.showRemoveMemberDialog(context, widget.groupId, member),
                   onAddMember: () => controller.goToAddMembers(),
                 ),
                 const SizedBox(height: 24),

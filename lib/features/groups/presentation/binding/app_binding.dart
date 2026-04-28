@@ -25,7 +25,7 @@ import '../../../groups/domain/usecases/get_members.dart';
 import '../../../groups/domain/usecases/search_users_usecase.dart';
 import '../../../groups/domain/usecases/update_member_status.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
-
+import '../../../groups/presentation/pages/select_member_screen.dart'; // مسیر صحیح را وارد کنید
 
 class AppBinding extends Bindings {
   @override
@@ -34,7 +34,6 @@ class AppBinding extends Bindings {
     final firestore = FirebaseFirestore.instance;
     final storage = FirebaseStorage.instance;
 
-    // ================= NETWORK SERVICE (اضافه شد) =================
     Get.put(NetworkService(), permanent: true);
 
     // ================= AUTH =================
@@ -93,5 +92,6 @@ class AppBinding extends Bindings {
     // ================= SETTINGS & THEME =================
     Get.put(SettingsController(), permanent: true);
     Get.put(ThemeController(), permanent: true);
+
   }
 }

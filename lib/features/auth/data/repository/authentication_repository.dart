@@ -3,33 +3,34 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:roomly/features/auth/presentations/widgets/signup_with_email_and_password_failure.dart';
-import 'package:roomly/features/dashboard/presentation/pages/splash_screen.dart';
-import 'package:roomly/features/home/presentation/pages/home_screen.dart';
 
 class AuthenticationRepository extends GetxController {
   static AuthenticationRepository get instance => Get.find();
 
-  // Firebase Instances
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
 
   final Rx<User?> firebaseUser = Rx<User?>(null);
   RxBool isLoading = true.obs;
 
-
-
   @override
   void onInit() {
     super.onInit();
+    // مقدار اولیه کاربر فعلی (ممکن است null باشد)
     firebaseUser.value = _auth.currentUser;
 
-    firebaseUser.bindStream(_auth.authStateChanges());
-
-    ever(firebaseUser, (_) {
+    // گوش دادن به تغییرات وضعیت احراز هویت
+    _auth.authStateChanges().listen((User? user) {
+      firebaseUser.value = user;
+      // مهم: بعد از اولین رویداد (حتی اگر null باشد)، isLoading را false کن
+      if (isLoading.value) {
+        isLoading.value = false;
+      }
+    }, onError: (error) {
       isLoading.value = false;
+      print("Auth state change error: $error");
     });
   }
-
 
   // --- REGISTRATION ---
   Future<void> createUserWithEmailAndPassword(
@@ -39,11 +40,8 @@ class AuthenticationRepository extends GetxController {
         email: email,
         password: password,
       );
-
       final user = credential.user;
-
       if (user != null) {
-        // Create user profile in Firestore
         await _db.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': email,
@@ -68,7 +66,6 @@ class AuthenticationRepository extends GetxController {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
     } on FirebaseAuthException catch (e) {
-      // You can create a LoginFailure class similar to SignupFailure if needed
       throw "Login failed: ${e.message}";
     } catch (e) {
       throw "An unexpected error occurred.";
@@ -78,25 +75,14 @@ class AuthenticationRepository extends GetxController {
   // --- GOOGLE SIGN IN ---
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Trigger the Google Authentication flow
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-
-      // Return null if the user canceled the sign-in
       if (googleUser == null) return null;
-
-      // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-      // Create a new credential for Firebase
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-
-      // Once signed in, return the UserCredential
       final userCredential = await _auth.signInWithCredential(credential);
-
-      // Save user to Firestore if it's a new user
       if (userCredential.additionalUserInfo?.isNewUser ?? false) {
         await _db.collection('users').doc(userCredential.user!.uid).set({
           'uid': userCredential.user!.uid,
@@ -107,9 +93,7 @@ class AuthenticationRepository extends GetxController {
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
-
       return userCredential;
-
     } on FirebaseAuthException catch (e) {
       throw "Google Auth Failed: ${e.message}";
     } catch (e) {

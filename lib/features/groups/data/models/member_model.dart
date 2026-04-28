@@ -10,7 +10,7 @@ class MemberModel {
   final DateTime joinedAt;
   final String invitationStatus;
   final String? invitedBy;
-  final bool isAppUser;
+  // final bool isAppUser;
 
   const MemberModel({
     required this.firestoreId,
@@ -21,7 +21,7 @@ class MemberModel {
     required this.joinedAt,
     required this.invitationStatus,
     this.invitedBy,
-    this.isAppUser = false,
+    // this.isAppUser = false,
   });
 
 
@@ -45,7 +45,7 @@ class MemberModel {
       joinedAt: joinedAt ?? this.joinedAt,
       invitationStatus: invitationStatus ?? this.invitationStatus,
       invitedBy: invitedBy ?? this.invitedBy,
-      isAppUser: isAppUser ?? this.isAppUser,
+      // isAppUser: isAppUser ?? this.isAppUser,
     );
   }
 
@@ -60,7 +60,7 @@ class MemberModel {
       joinedAt: entity.joinedAt,
       invitationStatus: entity.invitationStatus,
       invitedBy: entity.invitedBy,
-      isAppUser: entity.isAppUser,
+      // isAppUser: entity.isAppUser,
     );
   }
 
@@ -80,7 +80,7 @@ class MemberModel {
           : DateTime.tryParse(map['joinedAt'] ?? '') ?? DateTime.now(),
       invitationStatus: map['invitationStatus'] ?? 'pending',
       invitedBy: map['invitedBy'],
-      isAppUser: map['isAppUser'] ?? false,
+      // isAppUser: map['isAppUser'] ?? false,
     );
   }
 
@@ -94,7 +94,7 @@ class MemberModel {
       'joinedAt': Timestamp.fromDate(joinedAt),
       'invitationStatus': invitationStatus,
       'invitedBy': invitedBy,
-      'isAppUser': isAppUser,
+      // 'isAppUser': isAppUser,
     };
   }
 
@@ -109,7 +109,7 @@ class MemberModel {
       joinedAt: joinedAt,
       invitationStatus: invitationStatus,
       invitedBy: invitedBy,
-      isAppUser: isAppUser,
+      // isAppUser: isAppUser,
     );
   }
 }

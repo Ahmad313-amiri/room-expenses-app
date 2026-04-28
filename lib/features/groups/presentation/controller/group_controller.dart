@@ -5,9 +5,6 @@ import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/util/app_logger.dart';
 import '../../../../core/util/error_handler.dart';
 import '../../../../core/util/net_work.dart';
@@ -21,6 +18,7 @@ import '../../domain/usecases/create_group.dart';
 import '../../domain/usecases/delete_group.dart';
 import '../../domain/usecases/get_groups.dart';
 import '../../domain/usecases/get_members.dart';
+import '../../domain/usecases/get_members_paginated.dart';
 import '../../domain/usecases/search_users_usecase.dart';
 import '../../domain/usecases/update_member_status.dart';
 import '../widgets/contact_model.dart' hide Contact;
@@ -35,6 +33,7 @@ class GroupsController extends GetxController {
   final GetMembers getMembersUseCase;
   final GroupRemoteDataSource remoteDataSource;
   final UpdateMemberStatus updateMemberStatusUseCase;
+  final GetMembersPaginated getMembersPaginatedUseCase;
 
   GroupsController({
     required this.searchUsersUseCase,
@@ -45,6 +44,7 @@ class GroupsController extends GetxController {
     required this.getMembersUseCase,
     required this.remoteDataSource,
     required this.updateMemberStatusUseCase,
+    required this.getMembersPaginatedUseCase,
   });
 
   // Reactive state
@@ -62,6 +62,12 @@ class GroupsController extends GetxController {
   final groupImageFile = Rxn<File>();
   final isLoadingImage = false.obs;
   final balanceText = '0.0'.obs;
+
+  // Pagination for members
+  var hasMoreMembers = true.obs;
+  var isLoadingMoreMembers = false.obs;
+  DocumentSnapshot? _lastMemberDoc;
+  static const int _memberPageSize = 20;
 
   // Misc
   Timer? _debounce;
@@ -89,19 +95,22 @@ class GroupsController extends GetxController {
     super.onClose();
   }
 
-
-  // ==========  getter groupId ==========
+  // ========== getter groupId ==========
   String get groupId => currentGroup.value?.id ?? '';
-
-
 
   // ============================================================
   // Group fetching
   // ============================================================
-  Future<void> fetchGroups({bool forceRefresh = false, bool initialLoad = false}) async {
+  Future<void> fetchGroups({
+    bool forceRefresh = false,
+    bool initialLoad = false,
+  }) async {
     if (!_networkService.isOnline && !forceRefresh) {
       if (!initialLoad) {
-        ErrorHandler.showInfo('Offline', 'Showing cached data. Connect to refresh.');
+        ErrorHandler.showInfo(
+          'Offline',
+          'Showing cached data. Connect to refresh.',
+        );
       }
       return;
     }
@@ -112,15 +121,22 @@ class GroupsController extends GetxController {
         AppLogger.w('fetchGroups: User not logged in');
         return;
       }
-      final remoteGroups = await getGroupsUseCase(uid).timeout(const Duration(seconds: 15));
-      final models = remoteGroups.map((e) => e is GroupModel ? e : GroupModel.fromEntity(e)).toList();
+      final remoteGroups = await getGroupsUseCase(
+        uid,
+      ).timeout(const Duration(seconds: 15));
+      final models = remoteGroups
+          .map((e) => e is GroupModel ? e : GroupModel.fromEntity(e))
+          .toList();
       groups.assignAll(models);
       allGroups.assignAll(models);
       AppLogger.i('Fetched ${models.length} groups');
     } catch (e, stack) {
       AppLogger.e('fetchGroups error', e, stack);
       if (!initialLoad) {
-        ErrorHandler.handleError('Network Error', ErrorHandler.getUserFriendlyException(e));
+        ErrorHandler.handleError(
+          'Network Error',
+          ErrorHandler.getUserFriendlyException(e),
+        );
       }
     } finally {
       isLoading.value = false;
@@ -131,7 +147,9 @@ class GroupsController extends GetxController {
     if (query.isEmpty) {
       groups.value = allGroups;
     } else {
-      groups.value = allGroups.where((g) => g.name.toLowerCase().contains(query.toLowerCase())).toList();
+      groups.value = allGroups
+          .where((g) => g.name.toLowerCase().contains(query.toLowerCase()))
+          .toList();
     }
   }
 
@@ -145,14 +163,15 @@ class GroupsController extends GetxController {
       if (!_networkService.isOnline) throw Exception('No internet connection');
 
       final remoteId = await createGroupUseCase(group, imageFile: imageFile);
-      // If image was uploaded separately? The use case already handles image upload.
-      // But in our implementation, createGroupUseCase calls repository which handles upload.
       await fetchGroups();
       ErrorHandler.showSuccess('Success', 'Group created successfully');
       return remoteId;
     } catch (e, stack) {
       AppLogger.e('createNewGroup error', e, stack);
-      ErrorHandler.handleError('Creation Failed', ErrorHandler.getUserFriendlyException(e));
+      ErrorHandler.handleError(
+        'Creation Failed',
+        ErrorHandler.getUserFriendlyException(e),
+      );
       return null;
     } finally {
       isLoading.value = false;
@@ -170,19 +189,20 @@ class GroupsController extends GetxController {
       ErrorHandler.showSuccess('Success', 'Group updated');
     } catch (e, stack) {
       AppLogger.e('updateGroupDetails error', e, stack);
-      ErrorHandler.handleError('Update Failed', ErrorHandler.getUserFriendlyException(e));
+      ErrorHandler.handleError(
+        'Update Failed',
+        ErrorHandler.getUserFriendlyException(e),
+      );
       rethrow;
     } finally {
       isLoading.value = false;
     }
   }
 
-  // ========== refreshGroups  ==========
   Future<void> refreshGroups() async {
     await fetchGroups(forceRefresh: true, initialLoad: false);
   }
 
-// ==========refreshGroupDetail ==========
   Future<void> refreshGroupDetail(String groupId) async {
     await loadGroupAndMembers(groupId, forceRefresh: true);
   }
@@ -196,51 +216,104 @@ class GroupsController extends GetxController {
       allGroups.removeWhere((g) => g.id == groupId);
       if (currentGroup.value?.id == groupId) currentGroup.value = null;
       ErrorHandler.showSuccess('Deleted', 'Group permanently deleted');
-      Get.offAllNamed('/groups'); // Navigate to groups list
+      Get.offAllNamed('/groups');
     } catch (e, stack) {
       AppLogger.e('deleteSelectedGroup error', e, stack);
-      ErrorHandler.handleError('Delete Failed', ErrorHandler.getUserFriendlyException(e));
+      ErrorHandler.handleError(
+        'Delete Failed',
+        ErrorHandler.getUserFriendlyException(e),
+      );
     } finally {
       isLoading.value = false;
     }
   }
 
   // ============================================================
-  // Members management
+  // Members management with pagination
   // ============================================================
-  Future<void> loadMembers(String groupId, {bool showErrorSnackbar = true}) async {
+
+  // MODIFIED: renamed from loadMembers → loadMembersInitial (clears and loads first page)
+  Future<void> loadMembersInitial(String groupId) async {
     try {
       isLoading.value = true;
-      final remoteMembers = await getMembersUseCase(groupId);
-      members.assignAll(remoteMembers);
-      AppLogger.i('Loaded ${remoteMembers.length} members');
+      members.clear();
+      hasMoreMembers.value = true;
+      _lastMemberDoc = null;
+
+      final (newMembers, lastDoc, hasMore) = await getMembersPaginatedUseCase(
+        groupId,
+        limit: _memberPageSize,
+        startAfter: null,
+      );
+      members.assignAll(newMembers);
+      _lastMemberDoc = lastDoc;
+      hasMoreMembers.value = hasMore;
+      AppLogger.i('Loaded ${newMembers.length} members (initial)');
     } catch (e, stack) {
-      AppLogger.e('loadMembers error', e, stack);
-      if (showErrorSnackbar) {
-        ErrorHandler.handleError('Failed to load members', ErrorHandler.getUserFriendlyException(e));
-      }
-      rethrow;
+      AppLogger.e('loadMembersInitial error', e, stack);
+      ErrorHandler.handleError(
+        'Failed to load members',
+        ErrorHandler.getUserFriendlyException(e),
+      );
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> addMemberToGroup(String groupId, String identifier, String name) async {
+  // ADDED: public wrapper to reset pagination and reload (used after add/remove)
+  Future<void> refreshMembers(String groupId) async {
+    await loadMembersInitial(groupId);
+  }
+
+  Future<void> loadMoreMembers(String groupId) async {
+    if (isLoadingMoreMembers.value || !hasMoreMembers.value) return;
+    isLoadingMoreMembers.value = true;
+    try {
+      final (newMembers, lastDoc, hasMore) = await getMembersPaginatedUseCase(
+        groupId,
+        limit: _memberPageSize,
+        startAfter: _lastMemberDoc,
+      );
+      if (newMembers.isNotEmpty) {
+        members.addAll(newMembers);
+        _lastMemberDoc = lastDoc;
+      }
+      hasMoreMembers.value = hasMore;
+      AppLogger.i('Loaded ${newMembers.length} more members');
+    } catch (e, stack) {
+      AppLogger.e('loadMoreMembers error', e, stack);
+      hasMoreMembers.value = false;
+    } finally {
+      isLoadingMoreMembers.value = false;
+    }
+  }
+
+  Future<void> addMemberToGroup(
+      String groupId,
+      String identifier,
+      String name,
+      ) async {
     try {
       isLoading.value = true;
       if (groupId.isEmpty || identifier.isEmpty || name.isEmpty) {
         throw Exception('All fields required');
       }
-      // Check existing members (refresh if empty)
-      if (members.isEmpty) await loadMembers(groupId);
+      // MODIFIED: use loadMembersInitial instead of old loadMembers
+      if (members.isEmpty) await loadMembersInitial(groupId);
 
-      final userData = await remoteDataSource.findUserByEmail(identifier.trim().toLowerCase());
+      final userData = await remoteDataSource.findUserByEmail(
+        identifier.trim().toLowerCase(),
+      );
       final resolvedUserId = userData?['uid'] ?? identifier;
-      final existing = members.firstWhereOrNull((m) => m.userId == resolvedUserId);
+      final existing = members.firstWhereOrNull(
+            (m) => m.userId == resolvedUserId,
+      );
       if (existing != null) {
-        throw Exception(existing.invitationStatus == 'pending'
-            ? 'Invitation already pending'
-            : 'User already in group');
+        throw Exception(
+          existing.invitationStatus == 'pending'
+              ? 'Invitation already pending'
+              : 'User already in group',
+        );
       }
       final newMember = MemberEntity(
         groupId: groupId,
@@ -250,15 +323,21 @@ class GroupsController extends GetxController {
         invitationStatus: 'pending',
         joinedAt: DateTime.now(),
         invitedBy: currentUserId,
-        isAppUser: userData != null,
         firestoreId: '',
       );
       await addMemberUseCase(groupId, newMember);
-      await loadMembers(groupId);
-      ErrorHandler.showSuccess('Invitation Sent', 'Invitation sent successfully');
+      // MODIFIED: refresh member list with reset pagination
+      await refreshMembers(groupId);
+      ErrorHandler.showSuccess(
+        'Invitation Sent',
+        'Invitation sent successfully',
+      );
     } catch (e, stack) {
       AppLogger.e('addMemberToGroup error', e, stack);
-      ErrorHandler.handleError('Failed to add member', ErrorHandler.getUserFriendlyException(e));
+      ErrorHandler.handleError(
+        'Failed to add member',
+        ErrorHandler.getUserFriendlyException(e),
+      );
     } finally {
       isLoading.value = false;
     }
@@ -268,37 +347,55 @@ class GroupsController extends GetxController {
     try {
       isLoading.value = true;
       await remoteDataSource.removeMember(groupId, userId);
-      members.removeWhere((m) => m.userId == userId);
+      // MODIFIED: refresh member list with reset pagination
+      await refreshMembers(groupId);
       ErrorHandler.showSuccess('Removed', 'Member removed successfully');
     } catch (e, stack) {
       AppLogger.e('removeMemberFromGroup error', e, stack);
-      ErrorHandler.handleError('Failed to remove member', ErrorHandler.getUserFriendlyException(e));
+      ErrorHandler.handleError(
+        'Failed to remove member',
+        ErrorHandler.getUserFriendlyException(e),
+      );
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Fixed: Actually updates status in backend
-  Future<void> updateMemberStatusLocally(String groupId, String userId, String status) async {
+  Future<void> updateMemberStatusLocally(
+      String groupId,
+      String userId,
+      String status,
+      ) async {
     try {
       isLoading.value = true;
       await updateMemberStatusUseCase(groupId, userId, status);
-      // Refresh members to get updated status
-      await loadMembers(groupId);
-      ErrorHandler.showSuccess('Status Updated', 'Member status changed to $status');
+      // MODIFIED: refresh member list with reset pagination
+      await refreshMembers(groupId);
+      ErrorHandler.showSuccess(
+        'Status Updated',
+        'Member status changed to $status',
+      );
     } catch (e, stack) {
       AppLogger.e('updateMemberStatus error', e, stack);
-      ErrorHandler.handleError('Update Failed', ErrorHandler.getUserFriendlyException(e));
+      ErrorHandler.handleError(
+        'Update Failed',
+        ErrorHandler.getUserFriendlyException(e),
+      );
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> acceptGroupInvitation({required String groupId, required String userId}) async {
+  Future<void> acceptGroupInvitation({
+    required String groupId,
+    required String userId,
+  }) async {
     await updateMemberStatusLocally(groupId, userId, 'accepted');
   }
 
-  Future<void> addSelectedMembers(List<Map<String, dynamic>> selectedUsers) async {
+  Future<void> addSelectedMembers(
+      List<Map<String, dynamic>> selectedUsers,
+      ) async {
     final currentGroupId = currentGroup.value?.id;
     if (currentGroupId == null || currentGroupId.isEmpty) {
       ErrorHandler.handleError('Error', 'Group not found');
@@ -306,33 +403,40 @@ class GroupsController extends GetxController {
     }
     try {
       isLoading.value = true;
-      await loadMembers(currentGroupId);
+      // MODIFIED: use loadMembersInitial to reset pagination state
+      await loadMembersInitial(currentGroupId);
       int added = 0;
       for (final user in selectedUsers) {
         final uid = user['uid']?.toString().trim() ?? '';
         final name = user['name']?.toString().trim() ?? 'Unknown';
-        final alreadyExists = members.any((m) => m.userId == uid || m.name == name);
+        final alreadyExists = members.any(
+              (m) => m.userId == uid || m.name == name,
+        );
         if (alreadyExists) continue;
         final newMember = MemberEntity(
           groupId: currentGroupId,
-          userId: uid.isNotEmpty ? uid : name, // fallback
+          userId: uid.isNotEmpty ? uid : name,
           name: name,
           role: 'member',
-          invitationStatus: 'accepted', // V1: add as accepted directly
+          invitationStatus: 'accepted',
           joinedAt: DateTime.now(),
           invitedBy: currentUserId,
-          isAppUser: user['isAppUser'] ?? false,
           firestoreId: '',
         );
         await addMemberUseCase(currentGroupId, newMember);
         added++;
       }
-      await loadMembers(currentGroupId);
-      Get.back(); // pop select members screen
-      ErrorHandler.showSuccess('Members Added', '$added member(s) added');
+      // MODIFIED: refresh after adding
+      await refreshMembers(currentGroupId);
+      if (added > 0) {
+        ErrorHandler.showSuccess('Members Added', '$added member(s) added');
+      }
     } catch (e, stack) {
       AppLogger.e('addSelectedMembers error', e, stack);
-      ErrorHandler.handleError('Error', ErrorHandler.getUserFriendlyException(e));
+      ErrorHandler.handleError(
+        'Error',
+        ErrorHandler.getUserFriendlyException(e),
+      );
     } finally {
       isLoading.value = false;
     }
@@ -347,7 +451,10 @@ class GroupsController extends GetxController {
       searchResults.clear();
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 400), () => searchUsers(query));
+    _debounce = Timer(
+      const Duration(milliseconds: 400),
+          () => searchUsers(query),
+    );
   }
 
   Future<void> searchUsers(String query) async {
@@ -371,7 +478,10 @@ class GroupsController extends GetxController {
 
   Future<void> fetchPhoneContacts() async {
     if (!_networkService.isOnline) {
-      ErrorHandler.showInfo('Offline', 'Cannot load contacts without internet.');
+      ErrorHandler.showInfo(
+        'Offline',
+        'Cannot load contacts without internet.',
+      );
       return;
     }
 
@@ -384,12 +494,13 @@ class GroupsController extends GetxController {
         return;
       }
 
-      // دریافت مخاطبین با شماره تلفن (برای V1 کافی است)
       final fetchedContacts = await fc.FlutterContacts.getAll(
         properties: {fc.ContactProperty.phone},
       );
       contacts.assignAll(fetchedContacts);
-      AppLogger.i('Loaded ${fetchedContacts.length} contacts with phone numbers');
+      AppLogger.i(
+        'Loaded ${fetchedContacts.length} contacts with phone numbers',
+      );
     } catch (e, stack) {
       AppLogger.e('Failed to fetch phone contacts', e, stack);
       ErrorHandler.handleError(
@@ -402,14 +513,19 @@ class GroupsController extends GetxController {
   // ============================================================
   // Group detail screen helpers
   // ============================================================
-  Future<void> loadGroupAndMembers(String groupId, {bool forceRefresh = false}) async {
+
+  // MODIFIED: inside class – now calls loadMembersInitial instead of undefined loadMembers
+  Future<void> loadGroupAndMembers(
+      String groupId, {
+        bool forceRefresh = false,
+      }) async {
     if (!_networkService.isOnline && !forceRefresh) {
       ErrorHandler.showInfo('Offline', 'Cannot refresh. Connect to internet.');
       return;
     }
     final group = allGroups.firstWhereOrNull((g) => g.id == groupId);
     if (group != null) currentGroup.value = group;
-    await loadMembers(groupId);
+    await loadMembersInitial(groupId); //
     _watchGroupBalance(groupId);
   }
 
@@ -421,15 +537,18 @@ class GroupsController extends GetxController {
         .collection('expenses')
         .where('isDeleted', isEqualTo: false)
         .snapshots()
-        .listen((snapshot) {
-      double total = 0;
-      for (var doc in snapshot.docs) {
-        total += (doc.data()['amount'] ?? 0).toDouble();
-      }
-      balanceText.value = total.toStringAsFixed(0);
-    }, onError: (e) {
-      AppLogger.e('Balance stream error', e);
-    });
+        .listen(
+          (snapshot) {
+        double total = 0;
+        for (var doc in snapshot.docs) {
+          total += (doc.data()['amount'] ?? 0).toDouble();
+        }
+        balanceText.value = total.toStringAsFixed(0);
+      },
+      onError: (e) {
+        AppLogger.e('Balance stream error', e);
+      },
+    );
   }
 
   void goToAddMembers() {
@@ -441,79 +560,17 @@ class GroupsController extends GetxController {
     Get.toNamed('/select-members', arguments: {'groupId': groupId});
   }
 
-  // Image upload
-  Future<String?> uploadGroupImage(File imageFile, String groupId) async {
-    try {
-      if (!_networkService.isOnline) throw Exception('No internet connection');
-      isLoadingImage.value = true;
-      final ref = FirebaseStorage.instance.ref().child('group_images/$groupId.jpg');
-      await ref.putFile(imageFile);
-      final url = await ref.getDownloadURL();
-      await remoteDataSource.updateGroupCover(groupId, url);
-      // Update local state
-      if (currentGroup.value?.id == groupId) {
-        final updated = (currentGroup.value as GroupModel).copyWith(coverImageUrl: url);
-        currentGroup.value = updated;
-        final index = allGroups.indexWhere((g) => g.id == groupId);
-        if (index != -1) allGroups[index] = updated as GroupModel;
-        final groupIndex = groups.indexWhere((g) => g.id == groupId);
-        if (groupIndex != -1) groups[groupIndex] = updated;
-      }
-      ErrorHandler.showSuccess('Uploaded', 'Group image updated');
-      return url;
-    } catch (e, stack) {
-      AppLogger.e('uploadGroupImage error', e, stack);
-      ErrorHandler.handleError('Upload Failed', ErrorHandler.getUserFriendlyException(e));
-      return null;
-    } finally {
-      isLoadingImage.value = false;
-    }
-  }
-
-  void showPickerMenu(BuildContext context, GroupEntity group) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Take Photo'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                final picker = ImagePicker();
-                final picked = await picker.pickImage(source: ImageSource.camera);
-                if (picked != null) {
-                  await uploadGroupImage(File(picked.path), group.id);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                final picker = ImagePicker();
-                final picked = await picker.pickImage(source: ImageSource.gallery);
-                if (picked != null) {
-                  await uploadGroupImage(File(picked.path), group.id);
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ============================================================
-  // Dialogs (keep UI unchanged, just reusing error handling)
+  // Dialogs (unchanged)
   // ============================================================
   void showEditGroupNameDialog(BuildContext context, GroupEntity group) {
     final controller = TextEditingController(text: group.name);
     Get.defaultDialog(
       title: 'Edit Group Name',
-      content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Enter new name')),
+      content: TextField(
+        controller: controller,
+        decoration: const InputDecoration(hintText: 'Enter new name'),
+      ),
       confirm: ElevatedButton(
         onPressed: () async {
           final newName = controller.text.trim();
@@ -533,25 +590,54 @@ class GroupsController extends GetxController {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Group'),
-        content: const Text('Are you sure? This action cannot be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await deleteSelectedGroup(groupId);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        bool isLoading = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Delete Group'),
+              content: isLoading
+                  ? const SizedBox(
+                height: 50,
+                child: Center(child: CircularProgressIndicator()),
+              )
+                  : const Text('Are you sure? This action cannot be undone.'),
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                    setState(() => isLoading = true);
+                    try {
+                      await deleteSelectedGroup(groupId);
+                      if (context.mounted) Navigator.of(ctx).pop();
+                    } catch (e) {
+                      setState(() => isLoading = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e')),
+                      );
+                    }
+                  },
+                  child: const Text('Delete'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  void showRemoveMemberDialog(BuildContext context, String groupId, MemberEntity member) {
+  void showRemoveMemberDialog(
+      BuildContext context,
+      String groupId,
+      MemberEntity member,
+      ) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -559,7 +645,10 @@ class GroupsController extends GetxController {
         title: const Text('Remove Member'),
         content: Text('Remove ${member.name} from the group?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
@@ -574,8 +663,24 @@ class GroupsController extends GetxController {
   }
 
   bool canRemoveMember(MemberEntity member) {
-    final currentUser = members.firstWhereOrNull((m) => m.userId == currentUserId);
+    final currentUser = members.firstWhereOrNull(
+          (m) => m.userId == currentUserId,
+    );
     if (currentUser == null) return false;
     return currentUser.role == 'admin' && member.userId != currentUserId;
   }
+  // ADDED: Fetches all members (non-paginated) for settlement screen
+  Future<List<MemberEntity>> getAllMembersForSettlement(String groupId) async {
+    try {
+      isLoading.value = true;
+      final allMembers = await getMembersUseCase(groupId);
+      return allMembers;
+    } catch (e, stack) {
+      AppLogger.e('getAllMembersForSettlement error', e, stack);
+      rethrow;
+    } finally {
+      isLoading.value = false;
+    }
+  }
 }
+// REMOVED: duplicate loadGroupAndMembers function that was outside the class

@@ -21,6 +21,7 @@ import '../../../groups/domain/usecases/create_group.dart';
 import '../../../groups/domain/usecases/delete_group.dart';
 import '../../../groups/domain/usecases/get_groups.dart';
 import '../../../groups/domain/usecases/get_members.dart';
+import '../../../groups/domain/usecases/get_members_paginated.dart';
 import '../../../groups/domain/usecases/search_users_usecase.dart';
 import '../../../groups/domain/usecases/update_member_status.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
@@ -33,7 +34,7 @@ class AppBinding extends Bindings {
     final firestore = FirebaseFirestore.instance;
     final storage = FirebaseStorage.instance;
 
-    Get.lazyPut(()=>NetworkService());
+    Get.lazyPut(() => NetworkService());
     // ================= AUTH =================
     Get.put(AuthenticationRepository(), permanent: true);
 
@@ -56,6 +57,7 @@ class AppBinding extends Bindings {
     Get.put(GetMembers(Get.find()), permanent: true);
     Get.put(SearchUsersUseCase(groupRemote), permanent: true);
     Get.put(UpdateMemberStatus(Get.find()), permanent: true);
+    Get.put(GetMembersPaginated(Get.find()), permanent: true); // اضافه شد
 
     // ================= GROUP CONTROLLER =================
     Get.put(
@@ -68,11 +70,12 @@ class AppBinding extends Bindings {
         getMembersUseCase: Get.find(),
         remoteDataSource: groupRemote,
         updateMemberStatusUseCase: Get.find(),
+        getMembersPaginatedUseCase: Get.find(), // اضافه شد
       ),
       permanent: true,
     );
 
-    // ================= EXPENSE DATA (lazy – created when needed) =================
+    // ================= EXPENSE DATA =================
     Get.lazyPut<ExpenseRemoteDataSource>(
           () => ExpenseRemoteDataSource(firestore: firestore),
       fenix: true,
@@ -81,8 +84,6 @@ class AppBinding extends Bindings {
           () => ExpenseRepositoryImpl(Get.find()),
       fenix: true,
     );
-
-
 
     Get.put(SettingsController(), permanent: true);
     Get.put(ThemeController(), permanent: true);
@@ -93,8 +94,6 @@ class AppBinding extends Bindings {
     Get.lazyPut(() => UpdateExpenseUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => DeleteExpenseUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => WatchGroupExpensesUseCase(Get.find()), fenix: true);
-    Get.lazyPut(() => WatchGroupExpensesUseCase(Get.find()), fenix: true);
     Get.lazyPut(() => CalculateGroupSettlementUseCase(), fenix: true);
-
   }
 }

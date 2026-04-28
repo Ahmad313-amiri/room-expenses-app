@@ -2,7 +2,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:get/get.dart';
-import 'package:roomly/features/groups/presentation/widgets/contact_model.dart' hide Contact;
 import '../controller/group_controller.dart';
 
 class SelectMembersScreen extends StatefulWidget {
@@ -16,17 +15,19 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
   final GroupsController controller = Get.find<GroupsController>();
   final TextEditingController searchController = TextEditingController();
 
+  // Map to store selected members (key = uid)
   final Map<String, Map<String, dynamic>> _selectedMembers = {};
 
   @override
   void initState() {
     super.initState();
     _refreshContacts();
-    debugPrint("🔥 SelectMembersScreen INIT");
+    debugPrint("🔥 SelectMembersScreen initialized");
     final args = Get.arguments;
-    debugPrint("📦 Arguments: $args");
+    debugPrint("📦 Arguments received: $args");
   }
 
+  // Request permissions and load phone contacts
   Future<void> _refreshContacts() async {
     final status = await FlutterContacts.permissions.request(PermissionType.readWrite);
     if (status == PermissionStatus.granted) {
@@ -34,6 +35,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     }
   }
 
+  // Toggle selection of a member
   void _toggleSelection(Map<String, dynamic> user) {
     final uid = user['uid'].toString();
     setState(() {
@@ -64,7 +66,9 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
         ),
         body: Column(
           children: [
+            // Horizontal list of selected members (if any)
             if (_selectedMembers.isNotEmpty) _buildSelectedHorizontalList(),
+
             Expanded(
               child: TabBarView(
                 children: [
@@ -73,6 +77,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
                 ],
               ),
             ),
+
             _buildConfirmButton(),
           ],
         ),
@@ -80,6 +85,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
+  // Build horizontal scrollable list of selected members
   Widget _buildSelectedHorizontalList() {
     return Container(
       height: 80,
@@ -87,25 +93,15 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: _selectedMembers.values.map((user) {
-          final avatar = user['avatar'];
-          ImageProvider? imageProvider;
-          if (avatar != null) {
-            if (avatar is Uint8List) {
-              imageProvider = MemoryImage(avatar);
-            } else if (avatar is String && avatar.isNotEmpty) {
-              imageProvider = NetworkImage(avatar);
-            }
-          }
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Stack(
               children: [
                 CircleAvatar(
                   radius: 25,
-                  backgroundImage: imageProvider,
-                  child: imageProvider == null
-                      ? Text((user['name'] ?? '?')[0].toUpperCase())
-                      : null,
+                  backgroundImage: user['avatar'] is Uint8List
+                      ? MemoryImage(user['avatar'])
+                      : NetworkImage(user['avatar']) as ImageProvider,
                 ),
                 Positioned(
                   right: 0,
@@ -126,6 +122,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
+  // Tab: search and select existing app users
   Widget _buildAppUsersTab() {
     return Column(
       children: [
@@ -170,6 +167,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
+  // Tab: select from phone contacts
   Widget _buildPhoneContactsTab() {
     return Obx(() {
       if (controller.contacts.isEmpty) {
@@ -200,6 +198,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     });
   }
 
+  // Reusable list tile for a user/contact
   Widget _buildUserListTile({
     required String title,
     required String subtitle,
@@ -210,8 +209,8 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
   }) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundImage: imageUrl != null && imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
-        child: (imageUrl == null || imageUrl.isEmpty) ? Text(title.isNotEmpty ? title[0] : '?') : null,
+        backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+        child: imageUrl == null ? Text(title[0]) : null,
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle),
@@ -223,33 +222,43 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
+  // Confirm button shown when at least one member is selected
   Widget _buildConfirmButton() {
     if (_selectedMembers.isEmpty) return const SizedBox.shrink();
-
     return Container(
       padding: const EdgeInsets.all(20),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF1D5CFF),
           minimumSize: const Size(double.infinity, 56),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        onPressed: () {
-          final selectedMembers = _selectedMembers.values.toList();
-          Get.back(
-            result: List<Map<String, dynamic>>.from(selectedMembers),
-          );
+        onPressed: () async {
+          try {
+            final selected = _selectedMembers.values.toList();
+
+            await controller.addSelectedMembers(selected);
+
+            Get.back(result: true);
+            Get.snackbar(
+              "Success",
+              "Members added successfully",
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.green,
+              colorText: Colors.white,
+            );
+          } catch (e) {
+            Get.snackbar(
+              "Error",
+              e.toString(),
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+          }
         },
-        child: Text(
-          'Confirm (${_selectedMembers.length} Members)',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        child: Text('Confirm (${_selectedMembers.length} Members)',
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
       ),
     );
   }

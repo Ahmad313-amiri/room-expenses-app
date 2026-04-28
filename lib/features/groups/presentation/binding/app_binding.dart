@@ -22,10 +22,10 @@ import '../../../groups/domain/usecases/create_group.dart';
 import '../../../groups/domain/usecases/delete_group.dart';
 import '../../../groups/domain/usecases/get_groups.dart';
 import '../../../groups/domain/usecases/get_members.dart';
+import '../../../groups/domain/usecases/get_members_paginated.dart'; // ADDED: import paginated use case
 import '../../../groups/domain/usecases/search_users_usecase.dart';
 import '../../../groups/domain/usecases/update_member_status.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
-import '../../../groups/presentation/pages/select_member_screen.dart'; // مسیر صحیح را وارد کنید
 
 class AppBinding extends Bindings {
   @override
@@ -59,7 +59,11 @@ class AppBinding extends Bindings {
     Get.put(SearchUsersUseCase(groupRemote), permanent: true);
     Get.put(UpdateMemberStatus(Get.find()), permanent: true);
 
+    // ADDED: register GetMembersPaginated use case
+    Get.put(GetMembersPaginated(Get.find<GroupRepository>()), permanent: true);
+
     // ================= GROUP CONTROLLER =================
+    // MODIFIED: now passes getMembersPaginatedUseCase
     Get.put(
       GroupsController(
         searchUsersUseCase: Get.find(),
@@ -70,6 +74,7 @@ class AppBinding extends Bindings {
         getMembersUseCase: Get.find(),
         remoteDataSource: groupRemote,
         updateMemberStatusUseCase: Get.find(),
+        getMembersPaginatedUseCase: Get.find(), // ADDED: required for pagination
       ),
       permanent: true,
     );
@@ -92,6 +97,5 @@ class AppBinding extends Bindings {
     // ================= SETTINGS & THEME =================
     Get.put(SettingsController(), permanent: true);
     Get.put(ThemeController(), permanent: true);
-
   }
 }

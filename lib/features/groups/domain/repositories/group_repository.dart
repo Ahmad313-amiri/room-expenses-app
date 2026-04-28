@@ -1,6 +1,7 @@
 import 'dart:io';
 import '../entities/group.dart';
 import '../entities/member_entity.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 abstract class GroupRepository {
   // Group operations
@@ -15,4 +16,10 @@ abstract class GroupRepository {
   Future<void> removeMember(String groupId, String userId);
   Future<List<MemberEntity>> getMembers(String groupId);
   Future<void> updateMemberStatus(String groupId, String userId, String status);
+
+  Future<(List<MemberEntity>, DocumentSnapshot?, bool)> getMembersPaginated(
+      String groupId, {
+        required int limit,
+        DocumentSnapshot? startAfter,
+      });
 }

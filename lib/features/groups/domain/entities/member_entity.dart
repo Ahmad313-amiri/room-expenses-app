@@ -7,7 +7,7 @@ class MemberEntity {
   final DateTime joinedAt;
   final String invitationStatus;
   final String? invitedBy;
-  final bool isAppUser;
+  // final bool isAppUser;
   final String? photoUrl;
 
   MemberEntity({
@@ -19,7 +19,7 @@ class MemberEntity {
     required this.invitationStatus,
     this.invitedBy,
     required this.name,
-    this.isAppUser = false,
+    // this.isAppUser = false,
     this.photoUrl
   });
 }

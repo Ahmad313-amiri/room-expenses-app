@@ -12,35 +12,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // _handleStartupLogic();
-  }
+   }
 
-  // // App startup decision logic
-  // Future<void> _handleStartupLogic() async {
-  //   // Simulate local data loading (DB, cache, token, etc.)
-  //   await Future.delayed(const Duration(seconds: 2));
-  //
-  //   // TODO:
-  //   // final isLoggedIn = await AuthStorage.isLoggedIn();
-  //   // final isProfileCompleted = await UserStorage.isProfileCompleted();
-  //
-  //   final isLoggedIn = true; // demo
-  //   final isProfileCompleted = false; // demo
-  //
-  //   if (!mounted) return;
-  //
-  //   if (!isLoggedIn){
-  //     // User not authenticated
-  //
-  //     Navigator.pushReplacementNamed(context, '/);
-  //   } else if (!isProfileCompleted) {
-  //     // User logged in but profile not completed
-  //     Navigator.pushReplacementNamed(context, '/profile-setup');
-  //   } else {
-  //     // User fully ready
-  //     Navigator.pushReplacementNamed(context, '/home');
-  //   }
-  // }
 
 
 
@@ -108,72 +81,11 @@ class _SplashScreenState extends State<SplashScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 48),
-                  // Offline-first technology badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade200),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          color: Color(0xFF1D5CFF),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'OFFLINE-FIRST TECHNOLOGY',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueGrey.shade800,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+
                 ],
               ),
             ),
-            // Bottom section
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Column(
-                children: [
-                  // Progress bar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 120),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: const LinearProgressIndicator(
-                        value: 0.35, // Sample progress value
-                        backgroundColor: Color(0xFFF2F4F7),
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1D5CFF)),
-                        minHeight: 4,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Footer text
-                  Text(
-                    'TRUSTED BY PROFESSIONALS',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade400,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+
           ],
         ),
       ),

@@ -20,6 +20,7 @@ class GroupsPage extends StatelessWidget {
         getMembersUseCase: Get.find(),
         remoteDataSource: Get.find(),
         updateMemberStatusUseCase: Get.find(),
+        getMembersPaginatedUseCase: Get.find(),
       ));
     }
     final controller = Get.find<GroupsController>();

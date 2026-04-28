@@ -67,9 +67,8 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
     });
 
     try {
-      // استفاده از متد بارگذاری با غیرفعال کردن نمایش Snackbar
-      await _groupsController.loadMembers(widget.groupId, showErrorSnackbar: false);
-      final memberEntities = _groupsController.members;
+      // MODIFIED: use new getAllMembersForSettlement instead of missing loadMembers
+      final memberEntities = await _groupsController.getAllMembersForSettlement(widget.groupId);
       members = memberEntities.map((m) {
         return {
           'id': m.userId,
@@ -87,7 +86,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
       });
     }
   }
-
   Future<void> _saveSettlement() async {
     final amount = double.tryParse(_amountController.text) ?? 0;
 

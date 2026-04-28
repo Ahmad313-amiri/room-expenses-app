@@ -7,7 +7,9 @@ import '../../domain/repositories/group_repository.dart';
 import '../data_sources/group_remote_datasource.dart';
 import '../models/group_model.dart';
 import '../models/member_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'group_repository_impl.dart' as remote;
 
 class GroupRepositoryImpl implements GroupRepository {
   final GroupRemoteDataSource remote;
@@ -44,12 +46,7 @@ class GroupRepositoryImpl implements GroupRepository {
   Future<String> createGroup(GroupEntity group, {File? imageFile}) async {
     try {
       var model = GroupModel.fromEntity(group);
-      String? imageUrl;
-      if (imageFile != null) {
-        final fileName = "${group.createdBy}_${DateTime.now().millisecondsSinceEpoch}";
-        imageUrl = await remote.uploadGroupImage(imageFile, fileName);
-        model = model.copyWith(coverImageUrl: imageUrl);
-      }
+
       final remoteId = await remote.addGroup(model);
 
       // Add creator as admin member
@@ -60,7 +57,7 @@ class GroupRepositoryImpl implements GroupRepository {
         role: 'admin',
         joinedAt: DateTime.now(),
         invitationStatus: 'accepted',
-        isAppUser: true,
+        // isAppUser: true,
         firestoreId: '',
       );
       await remote.addMemberToFirestore(remoteId, adminMember);
@@ -132,7 +129,11 @@ class GroupRepositoryImpl implements GroupRepository {
   }
 
   @override
-  Future<void> updateMemberStatus(String groupId, String userId, String status) async {
+  Future<void> updateMemberStatus(
+    String groupId,
+    String userId,
+    String status,
+  ) async {
     try {
       // V1 only accepts 'pending' or 'accepted'
       if (status != 'pending' && status != 'accepted') {
@@ -142,6 +143,25 @@ class GroupRepositoryImpl implements GroupRepository {
       AppLogger.i('Member $userId status updated to $status in group $groupId');
     } catch (e, stack) {
       AppLogger.e('Error updating member status', e, stack);
+      throw ErrorHandler.getUserFriendlyException(e);
+    }
+  }
+
+  @override
+  Future<(List<MemberEntity>, DocumentSnapshot?, bool)> getMembersPaginated(
+    String groupId, {
+    required int limit,
+    DocumentSnapshot? startAfter,
+  }) async {
+    try {
+      final result = await remote.getMembersPaginated(
+        groupId,
+        limit: limit,
+        startAfter: startAfter,
+      );
+      return result;
+    } catch (e, stack) {
+      AppLogger.e('Error in getMembersPaginated', e, stack);
       throw ErrorHandler.getUserFriendlyException(e);
     }
   }

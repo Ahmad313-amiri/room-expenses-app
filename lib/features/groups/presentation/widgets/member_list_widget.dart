@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/member_entity.dart';
 
-class MembersListWidget extends StatelessWidget {
+class MembersListWidget extends StatefulWidget {
   final List<MemberEntity> members;
   final bool Function(MemberEntity member) canRemoveMember;
   final Function(MemberEntity member) onRemoveMember;
   final VoidCallback onAddMember;
+  final bool hasMore;         // Whether more members can be loaded
+  final Future<void> Function() onLoadMore; // Callback to load next page
 
   const MembersListWidget({
     super.key,
@@ -13,7 +15,48 @@ class MembersListWidget extends StatelessWidget {
     required this.canRemoveMember,
     required this.onRemoveMember,
     required this.onAddMember,
+    this.hasMore = false,
+    required this.onLoadMore,
   });
+
+  @override
+  State<MembersListWidget> createState() => _MembersListWidgetState();
+}
+
+class _MembersListWidgetState extends State<MembersListWidget> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Trigger load more when scrolled near the bottom (100px threshold)
+  void _onScroll() {
+    if (_isLoadingMore) return;
+    if (!widget.hasMore) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (currentScroll >= maxScroll - 100) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    await widget.onLoadMore();
+    if (mounted) setState(() => _isLoadingMore = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,14 +70,14 @@ class MembersListWidget extends StatelessWidget {
               const Text('Group Members',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               TextButton.icon(
-                onPressed: onAddMember,
+                onPressed: widget.onAddMember,
                 icon: const Icon(Icons.person_add_alt_1, size: 18),
                 label: const Text('Add', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
         ),
-        if (members.isEmpty)
+        if (widget.members.isEmpty)
           Padding(
             padding: const EdgeInsets.all(20),
             child: Text(
@@ -44,11 +87,19 @@ class MembersListWidget extends StatelessWidget {
           )
         else
           ListView.builder(
+            controller: _scrollController,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: members.length,
+            itemCount: widget.members.length + (widget.hasMore ? 1 : 0), // +1 for loading indicator
             itemBuilder: (context, index) {
-              final member = members[index];
+              if (index == widget.members.length) {
+                // Show loading indicator at the bottom if more data exists
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final member = widget.members[index];
               return _buildMemberCard(member, index);
             },
           ),
@@ -136,9 +187,9 @@ class MembersListWidget extends StatelessWidget {
             children: [
               _buildStatusBadge(member.invitationStatus),
               const SizedBox(height: 4),
-              if (canRemoveMember(member))
+              if (widget.canRemoveMember(member))
                 GestureDetector(
-                  onTap: () => onRemoveMember(member),
+                  onTap: () => widget.onRemoveMember(member),
                   child: const Padding(
                     padding: EdgeInsets.only(top: 4),
                     child: Text('Remove',

@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import '../../../activity/presentation/controller/activity_controller.dart';
 import '../controller/group_controller.dart';
 import '../widgets/group_actions.dart';
-import '../widgets/group_header_widget.dart';
 import '../widgets/group_balance_widget.dart';
 import '../widgets/member_list_widget.dart';
 import '../widgets/recent_activity_widget.dart';
@@ -29,6 +28,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.loadGroupAndMembers(widget.groupId);
     });
+  }
+
+  void _addMembers() async {
+    final result = await Get.toNamed('/select-members', arguments: {'groupId': widget.groupId});
+    if (result != null && result is List<Map<String, dynamic>>) {
+      await controller.addSelectedMembers(result);
+    }
   }
 
   @override
@@ -84,18 +90,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
-                const SizedBox(height: 30),
-                GroupHeaderWidget(
-                  group: group,
-                  onEditImage: () => controller.showPickerMenu(context, group),
-                  imageFile: controller.groupImageFile.value,
-                  isLoadingImage: controller.isLoadingImage.value,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  controller.groupImageFile.value == null ? 'Tap to add group photo' : 'Tap to change photo',
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
                 const SizedBox(height: 24),
                 GroupBalanceWidget(
                   balanceText: controller.balanceText.value,
@@ -109,6 +103,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   canRemoveMember: controller.canRemoveMember,
                   onRemoveMember: (member) => controller.showRemoveMemberDialog(context, widget.groupId, member),
                   onAddMember: () => controller.goToAddMembers(),
+                  hasMore: controller.hasMoreMembers.value,
+                  onLoadMore: () => controller.loadMoreMembers(widget.groupId),
                 ),
                 const SizedBox(height: 24),
                 RecentActivityWidget(groupId: widget.groupId),

@@ -168,7 +168,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
       final newGroup = GroupEntity(
         id: '',
         name: groupName,
-        membersCount: _selectedMembers.length + 1, // +1 for creator
+        membersCount: _selectedMembers.length + 1,
         description: _selectedCategory,
         coverImageUrl: '',
         currency: _selectedCurrency.split(' ')[0],

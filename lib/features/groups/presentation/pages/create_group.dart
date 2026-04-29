@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/util/app_logger.dart';
 import '../../../../core/util/error_handler.dart';
 import '../../../auth/data/repository/authentication_repository.dart';
@@ -62,43 +61,6 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage({required ImageSource source}) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 85);
-    if (picked != null) {
-      setState(() {
-        _selectedImage = File(picked.path);
-      });
-    }
-  }
-
-  void _showImageSourceActionSheet() {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text("Take Photo"),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(source: ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text("Choose from Gallery"),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(source: ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _addMemberManual() {
     final name = _memberController.text.trim();
@@ -159,7 +121,6 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     }
 
     final uid = firebaseUser.uid;
-    final userName = firebaseUser.displayName ?? 'You';
 
     setState(() => _isCreating = true);
 
@@ -243,9 +204,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildImagePicker(),
-            const SizedBox(height: 32),
-            _buildTextField(
+             _buildTextField(
               "Group Name",
               _nameController,
               "Example: Friends Trip",
@@ -264,47 +223,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     );
   }
 
-  Widget _buildImagePicker() {
-    return Center(
-      child: GestureDetector(
-        onTap: _showImageSourceActionSheet,
-        child: Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: ClipOval(
-                child: _selectedImage != null
-                    ? Image.file(_selectedImage!, fit: BoxFit.cover)
-                    : Icon(
-                  Icons.groups_outlined,
-                  size: 48,
-                  color: Colors.grey.shade400,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1D5CFF),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.camera_alt,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildTextField(
       String label,

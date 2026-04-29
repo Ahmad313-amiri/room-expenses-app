@@ -121,7 +121,7 @@ class GroupExpenseSplitController extends GetxController {
     final paidBy = <String, double>{selectedPayerId.value: amount};
 
     final expense = Expense(
-      id: '', // خالی – در data source ID جدید ساخته می‌شود
+      id: '',
       amount: amount,
       description: description,
       date: DateTime.now(),

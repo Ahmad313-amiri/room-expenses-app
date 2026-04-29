@@ -31,6 +31,7 @@ class _MainDashboardState extends State<MainDashboard> {
       Get.put(ActivityController());
     }
     activityController = Get.find<ActivityController>();
+    activityController .fetchAllActivities(initialLoad: true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboardData());
   }
 

@@ -15,19 +15,18 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
   final GroupsController controller = Get.find<GroupsController>();
   final TextEditingController searchController = TextEditingController();
 
-  // Map to store selected members (key = uid)
   final Map<String, Map<String, dynamic>> _selectedMembers = {};
 
   @override
   void initState() {
     super.initState();
     _refreshContacts();
-    debugPrint("🔥 SelectMembersScreen initialized");
+    debugPrint("🔥 SelectMembersScreen INIT");
     final args = Get.arguments;
-    debugPrint("📦 Arguments received: $args");
+    debugPrint("📦 Arguments: $args");
+
   }
 
-  // Request permissions and load phone contacts
   Future<void> _refreshContacts() async {
     final status = await FlutterContacts.permissions.request(PermissionType.readWrite);
     if (status == PermissionStatus.granted) {
@@ -35,7 +34,6 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     }
   }
 
-  // Toggle selection of a member
   void _toggleSelection(Map<String, dynamic> user) {
     final uid = user['uid'].toString();
     setState(() {
@@ -66,7 +64,6 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
         ),
         body: Column(
           children: [
-            // Horizontal list of selected members (if any)
             if (_selectedMembers.isNotEmpty) _buildSelectedHorizontalList(),
 
             Expanded(
@@ -85,7 +82,6 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
-  // Build horizontal scrollable list of selected members
   Widget _buildSelectedHorizontalList() {
     return Container(
       height: 80,
@@ -122,8 +118,8 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
-  // Tab: search and select existing app users
   Widget _buildAppUsersTab() {
+
     return Column(
       children: [
         Padding(
@@ -167,7 +163,6 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
-  // Tab: select from phone contacts
   Widget _buildPhoneContactsTab() {
     return Obx(() {
       if (controller.contacts.isEmpty) {
@@ -181,7 +176,7 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
           bool isSelected = _selectedMembers.containsKey(contact.id);
 
           return _buildUserListTile(
-            title: contact.displayName ?? " ",
+            title: contact.displayName?? " ",
             subtitle: phone,
             trailingIcon: isSelected ? Icons.check_circle : Icons.add_circle_outline,
             isSelected: isSelected,
@@ -198,7 +193,6 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     });
   }
 
-  // Reusable list tile for a user/contact
   Widget _buildUserListTile({
     required String title,
     required String subtitle,
@@ -222,7 +216,6 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
     );
   }
 
-  // Confirm button shown when at least one member is selected
   Widget _buildConfirmButton() {
     if (_selectedMembers.isEmpty) return const SizedBox.shrink();
     return Container(
@@ -247,6 +240,8 @@ class _SelectMembersScreenState extends State<SelectMembersScreen> {
               backgroundColor: Colors.green,
               colorText: Colors.white,
             );
+
+
           } catch (e) {
             Get.snackbar(
               "Error",

@@ -260,7 +260,7 @@ class GroupsController extends GetxController {
     }
   }
 
-  // ADDED: public wrapper to reset pagination and reload (used after add/remove)
+  //  public wrapper to reset pagination and reload (used after add/remove)
   Future<void> refreshMembers(String groupId) async {
     await loadMembersInitial(groupId);
   }
@@ -669,7 +669,9 @@ class GroupsController extends GetxController {
     if (currentUser == null) return false;
     return currentUser.role == 'admin' && member.userId != currentUserId;
   }
+
   // ADDED: Fetches all members (non-paginated) for settlement screen
+
   Future<List<MemberEntity>> getAllMembersForSettlement(String groupId) async {
     try {
       isLoading.value = true;

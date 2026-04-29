@@ -27,14 +27,21 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.loadGroupAndMembers(widget.groupId);
+      final activity = Get.find<ActivityController>();
+      activity.loadActivities(widget.groupId);
     });
   }
+  Future<void> _onBackOrRefresh() async {
+    await controller.refreshGroupDetail(widget.groupId);
+    final activity = Get.find<ActivityController>();
+    activity.loadActivities(widget.groupId);
+  }
 
-  void _addMembers() async {
-    final result = await Get.toNamed('/select-members', arguments: {'groupId': widget.groupId});
-    if (result != null && result is List<Map<String, dynamic>>) {
-      await controller.addSelectedMembers(result);
-    }
+  @override
+  void didPopNext() {
+    final activity = Get.find<ActivityController>();
+    activity.loadActivities(widget.groupId);
+    controller.refreshGroupDetail(widget.groupId);
   }
 
   @override

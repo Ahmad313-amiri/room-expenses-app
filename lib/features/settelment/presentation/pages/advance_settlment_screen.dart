@@ -40,7 +40,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
     _networkService = Get.find<NetworkService>();
     _groupsController = Get.find<GroupsController>();
 
-    // فراخوانی بارگذاری اعضا بعد از اولین فریم (جلوگیری از setState در حین build)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchMembers();
     });

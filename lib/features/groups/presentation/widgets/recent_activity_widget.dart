@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../../../../core/util/app_logger.dart';
 import '../../../activity/domain/entity/activity.dart';
 import '../../../activity/presentation/controller/activity_controller.dart';
+
+import '../../../home/presentation/pages/activity_page.dart';
 import '../controller/group_controller.dart';
 
 class RecentActivityWidget extends StatefulWidget {
@@ -20,7 +22,6 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
   @override
   void initState() {
     super.initState();
-    // بارگذاری فعالیت‌ها بعد از اولین فریم (جلوگیری از setState در حین build)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       activityController.loadActivities(widget.groupId);
     });
@@ -85,7 +86,7 @@ class _RecentActivityWidgetState extends State<RecentActivityWidget> {
                 if (activityController.activities.isNotEmpty)
                   TextButton(
                     onPressed: () {
-                      Get.toNamed('/activity', arguments: {'groupId': widget.groupId});
+              Get.to(() => ActivityScreen(groupId: widget.groupId));
                     },
                     child: const Text('See All'),
                   ),

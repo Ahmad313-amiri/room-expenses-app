@@ -8,7 +8,7 @@ class CreateGroup {
   final GroupRepository repository;
   CreateGroup(this.repository);
 
-  Future<String> call(GroupEntity group, {File? imageFile}) async {
-    return await repository.createGroup(group, imageFile: imageFile);
+  Future<String> call(GroupEntity group) async {
+    return await repository.createGroup(group);
   }
 }

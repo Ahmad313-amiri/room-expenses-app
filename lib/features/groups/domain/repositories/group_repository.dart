@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 abstract class GroupRepository {
   // Group operations
-  Future<String> createGroup(GroupEntity group, {File? imageFile});
+  Future<String> createGroup(GroupEntity group);
   Future<List<GroupEntity>> getGroups({String? userId});
   Future<GroupEntity?> getGroupById(String id);
   Future<void> updateGroup(GroupEntity group);

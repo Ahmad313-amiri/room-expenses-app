@@ -21,7 +21,7 @@ import '../../domain/usecases/get_members.dart';
 import '../../domain/usecases/get_members_paginated.dart';
 import '../../domain/usecases/search_users_usecase.dart';
 import '../../domain/usecases/update_member_status.dart';
-import '../widgets/contact_model.dart' hide Contact;
+
 
 class GroupsController extends GetxController {
   // Dependencies
@@ -162,7 +162,7 @@ class GroupsController extends GetxController {
       if (group.name.trim().isEmpty) throw Exception('Group name required');
       if (!_networkService.isOnline) throw Exception('No internet connection');
 
-      final remoteId = await createGroupUseCase(group, imageFile: imageFile);
+      final remoteId = await createGroupUseCase(group);
       await fetchGroups();
       ErrorHandler.showSuccess('Success', 'Group created successfully');
       return remoteId;
@@ -215,8 +215,9 @@ class GroupsController extends GetxController {
       groups.removeWhere((g) => g.id == groupId);
       allGroups.removeWhere((g) => g.id == groupId);
       if (currentGroup.value?.id == groupId) currentGroup.value = null;
+      await fetchGroups();
+      Get.offAllNamed('/main', arguments: {'initialTab': 1});
       ErrorHandler.showSuccess('Deleted', 'Group permanently deleted');
-      Get.offAllNamed('/groups');
     } catch (e, stack) {
       AppLogger.e('deleteSelectedGroup error', e, stack);
       ErrorHandler.handleError(
@@ -289,10 +290,10 @@ class GroupsController extends GetxController {
   }
 
   Future<void> addMemberToGroup(
-      String groupId,
-      String identifier,
-      String name,
-      ) async {
+    String groupId,
+    String identifier,
+    String name,
+  ) async {
     try {
       isLoading.value = true;
       if (groupId.isEmpty || identifier.isEmpty || name.isEmpty) {
@@ -306,7 +307,7 @@ class GroupsController extends GetxController {
       );
       final resolvedUserId = userData?['uid'] ?? identifier;
       final existing = members.firstWhereOrNull(
-            (m) => m.userId == resolvedUserId,
+        (m) => m.userId == resolvedUserId,
       );
       if (existing != null) {
         throw Exception(
@@ -362,10 +363,10 @@ class GroupsController extends GetxController {
   }
 
   Future<void> updateMemberStatusLocally(
-      String groupId,
-      String userId,
-      String status,
-      ) async {
+    String groupId,
+    String userId,
+    String status,
+  ) async {
     try {
       isLoading.value = true;
       await updateMemberStatusUseCase(groupId, userId, status);
@@ -394,8 +395,8 @@ class GroupsController extends GetxController {
   }
 
   Future<void> addSelectedMembers(
-      List<Map<String, dynamic>> selectedUsers,
-      ) async {
+    List<Map<String, dynamic>> selectedUsers,
+  ) async {
     final currentGroupId = currentGroup.value?.id;
     if (currentGroupId == null || currentGroupId.isEmpty) {
       ErrorHandler.handleError('Error', 'Group not found');
@@ -410,7 +411,7 @@ class GroupsController extends GetxController {
         final uid = user['uid']?.toString().trim() ?? '';
         final name = user['name']?.toString().trim() ?? 'Unknown';
         final alreadyExists = members.any(
-              (m) => m.userId == uid || m.name == name,
+          (m) => m.userId == uid || m.name == name,
         );
         if (alreadyExists) continue;
         final newMember = MemberEntity(
@@ -453,7 +454,7 @@ class GroupsController extends GetxController {
     }
     _debounce = Timer(
       const Duration(milliseconds: 400),
-          () => searchUsers(query),
+      () => searchUsers(query),
     );
   }
 
@@ -516,9 +517,9 @@ class GroupsController extends GetxController {
 
   // MODIFIED: inside class – now calls loadMembersInitial instead of undefined loadMembers
   Future<void> loadGroupAndMembers(
-      String groupId, {
-        bool forceRefresh = false,
-      }) async {
+    String groupId, {
+    bool forceRefresh = false,
+  }) async {
     if (!_networkService.isOnline && !forceRefresh) {
       ErrorHandler.showInfo('Offline', 'Cannot refresh. Connect to internet.');
       return;
@@ -539,16 +540,16 @@ class GroupsController extends GetxController {
         .snapshots()
         .listen(
           (snapshot) {
-        double total = 0;
-        for (var doc in snapshot.docs) {
-          total += (doc.data()['amount'] ?? 0).toDouble();
-        }
-        balanceText.value = total.toStringAsFixed(0);
-      },
-      onError: (e) {
-        AppLogger.e('Balance stream error', e);
-      },
-    );
+            double total = 0;
+            for (var doc in snapshot.docs) {
+              total += (doc.data()['amount'] ?? 0).toDouble();
+            }
+            balanceText.value = total.toStringAsFixed(0);
+          },
+          onError: (e) {
+            AppLogger.e('Balance stream error', e);
+          },
+        );
   }
 
   void goToAddMembers() {
@@ -565,24 +566,48 @@ class GroupsController extends GetxController {
   // ============================================================
   void showEditGroupNameDialog(BuildContext context, GroupEntity group) {
     final controller = TextEditingController(text: group.name);
-    Get.defaultDialog(
-      title: 'Edit Group Name',
-      content: TextField(
-        controller: controller,
-        decoration: const InputDecoration(hintText: 'Enter new name'),
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Group Name'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Enter new name'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isEmpty) return;
+
+              if (newName == group.name) {
+                Navigator.pop(dialogContext);
+                return;
+              }
+
+              try {
+                final updatedGroup = (group as GroupModel).copyWith(name: newName);
+                await updateGroupDetails(updatedGroup);
+
+                if (Navigator.canPop(dialogContext)) {
+                  Navigator.pop(dialogContext);
+                }
+                ErrorHandler.showSuccess('Success', 'Group name updated');
+              } catch (e) {
+                ErrorHandler.handleError('Error', ErrorHandler.getUserFriendlyException(e));
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
-      confirm: ElevatedButton(
-        onPressed: () async {
-          final newName = controller.text.trim();
-          if (newName.isNotEmpty && newName != group.name) {
-            final updatedGroup = (group as GroupModel).copyWith(name: newName);
-            await updateGroupDetails(updatedGroup);
-          }
-          Get.back();
-        },
-        child: const Text('Save'),
-      ),
-      cancel: TextButton(onPressed: Get.back, child: const Text('Cancel')),
     );
   }
 
@@ -597,10 +622,7 @@ class GroupsController extends GetxController {
             return AlertDialog(
               title: const Text('Delete Group'),
               content: isLoading
-                  ? const SizedBox(
-                height: 50,
-                child: Center(child: CircularProgressIndicator()),
-              )
+                  ? const SizedBox(height: 50, child: Center(child: CircularProgressIndicator()))
                   : const Text('Are you sure? This action cannot be undone.'),
               actions: [
                 TextButton(
@@ -613,16 +635,8 @@ class GroupsController extends GetxController {
                       ? null
                       : () async {
                     setState(() => isLoading = true);
-                    try {
-                      await deleteSelectedGroup(groupId);
-                      if (context.mounted) Navigator.of(ctx).pop();
-                    } catch (e) {
-                      setState(() => isLoading = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
-                      );
-                    }
-                  },
+                    await deleteSelectedGroup(groupId);
+                               },
                   child: const Text('Delete'),
                 ),
               ],
@@ -632,12 +646,11 @@ class GroupsController extends GetxController {
       },
     );
   }
-
   void showRemoveMemberDialog(
-      BuildContext context,
-      String groupId,
-      MemberEntity member,
-      ) {
+    BuildContext context,
+    String groupId,
+    MemberEntity member,
+  ) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -664,7 +677,7 @@ class GroupsController extends GetxController {
 
   bool canRemoveMember(MemberEntity member) {
     final currentUser = members.firstWhereOrNull(
-          (m) => m.userId == currentUserId,
+      (m) => m.userId == currentUserId,
     );
     if (currentUser == null) return false;
     return currentUser.role == 'admin' && member.userId != currentUserId;
@@ -685,4 +698,5 @@ class GroupsController extends GetxController {
     }
   }
 }
+
 // REMOVED: duplicate loadGroupAndMembers function that was outside the class

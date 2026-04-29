@@ -15,7 +15,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final HomeController controller = Get.put(HomeController());
+  late final HomeController controller;
 
   final List<Widget> _pages = const [
     MainDashboard(),
@@ -23,6 +23,17 @@ class _HomeScreenState extends State<HomeScreen> {
     ActivityScreen(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(HomeController());
+    final args = Get.arguments as Map<String, dynamic>?;
+    final initialTab = args?['initialTab'] as int? ?? 0;
+    if (initialTab != controller.selectedIndex.value) {
+      controller.changeTab(initialTab);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

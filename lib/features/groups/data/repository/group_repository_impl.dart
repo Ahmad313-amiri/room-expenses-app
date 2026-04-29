@@ -43,7 +43,8 @@ class GroupRepositoryImpl implements GroupRepository {
   }
 
   @override
-  Future<String> createGroup(GroupEntity group, {File? imageFile}) async {
+
+  Future<String> createGroup(GroupEntity group) async {
     try {
       var model = GroupModel.fromEntity(group);
 

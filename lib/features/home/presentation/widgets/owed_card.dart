@@ -6,7 +6,7 @@ class OwedCard extends StatelessWidget {
   final String amount;
   final Color iconColor;
 
-  OwedCard({
+  const OwedCard({
     super.key,
     required this.icon,
     required this.owedText,
@@ -18,36 +18,47 @@ class OwedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-       shape: RoundedRectangleBorder(
-         side: BorderSide(
-           color: Colors.grey.shade400,
-           
-         ),
-         borderRadius: BorderRadius.circular(12)
-       ),
-         child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               height: 40,
               width: 40,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.2),
+                color: iconColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: iconColor),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 8),
             Text(
               owedText.toUpperCase(),
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+                fontSize: 11,
+              ),
             ),
-            const SizedBox(height: 3),
-            Text('\$ $amount', style: TextStyle(color: iconColor,fontWeight: FontWeight.bold  ,fontSize: 20)),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
+            Flexible(
+              child: Text(
+                '\$$amount',
+                style: TextStyle(
+                  color: iconColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
           ],
         ),
       ),

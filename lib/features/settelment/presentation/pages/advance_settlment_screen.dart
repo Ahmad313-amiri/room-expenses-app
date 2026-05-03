@@ -66,7 +66,6 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
     });
 
     try {
-      // MODIFIED: use new getAllMembersForSettlement instead of missing loadMembers
       final memberEntities = await _groupsController.getAllMembersForSettlement(widget.groupId);
       members = memberEntities.map((m) {
         return {
@@ -85,7 +84,8 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
       });
     }
   }
-  Future<void> _saveSettlement() async {
+
+  Future<void> _saveSettlement(BuildContext ctx) async {
     final amount = double.tryParse(_amountController.text) ?? 0;
 
     if (selectedPayer == null || selectedReceiver == null) {
@@ -124,8 +124,16 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
       AppLogger.i('Settlement saved in group ${widget.groupId}');
 
       if (mounted) {
+        // نمایش پیام موفقیت
         ErrorHandler.showSuccess('Success', 'Settlement recorded successfully');
-        Get.back(result: true);
+
+        // تأخیر برای دیده شدن پیام
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        if (mounted) {
+          // بستن صفحه و بازگشت با نتیجه true (برای رفرش صفحه قبلی در صورت نیاز)
+          Navigator.of(ctx).pop(true);
+        }
       }
     } catch (e, stack) {
       AppLogger.e('Failed to save settlement', e, stack);
@@ -336,7 +344,7 @@ class _AdvancedSettleUpScreenState extends State<AdvancedSettleUpScreen> {
                   height: 56,
                   child: ElevatedButton(
                     onPressed: (_isConfirmed && !isLoading && selectedPayer != null && selectedReceiver != null)
-                        ? _saveSettlement
+                        ? () => _saveSettlement(context)
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade700,

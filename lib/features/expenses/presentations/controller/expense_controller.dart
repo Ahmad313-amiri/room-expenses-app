@@ -1,4 +1,5 @@
 // lib/features/expenses/presentations/controller/expense_controller.dart
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -18,7 +19,8 @@ class GroupExpenseSplitController extends GetxController {
 
   var splitMethod = 'Equally'.obs;
   var participantIds = <String>[].obs;
-  var customShares = <String, double>{}.obs;
+  var customShares = <String, double>{}.obs;        // for Percentage (value in percent) and Custom (value in amount)
+  var shareCounts = <String, double>{}.obs;         // for Shares method (number of shares)
   var selectedPayerId = ''.obs;
   var isLoading = false.obs;
 
@@ -30,6 +32,7 @@ class GroupExpenseSplitController extends GetxController {
     this.members = members;
     participantIds.value = members.map((m) => m.userId).toList();
     customShares.value = {for (var m in members) m.userId: 0.0};
+    shareCounts.value = {for (var m in members) m.userId: 1.0}; // default 1 share per person
     selectedPayerId.value = members.first.userId;
     AppLogger.i('Expense controller initialized for group $groupId');
   }
@@ -56,6 +59,18 @@ class GroupExpenseSplitController extends GetxController {
       case 'Custom':
         for (var id in active) {
           shares[id] = customShares[id] ?? 0.0;
+        }
+        break;
+      case 'Shares':
+      // مجموع سهام
+        double totalShares = 0;
+        for (var id in active) {
+          totalShares += shareCounts[id] ?? 0;
+        }
+        if (totalShares <= 0) return {};
+        for (var id in active) {
+          final share = shareCounts[id] ?? 0;
+          shares[id] = total * (share / totalShares);
         }
         break;
     }
@@ -86,13 +101,19 @@ class GroupExpenseSplitController extends GetxController {
         final amountPerPerson = total / active.length;
         for (var id in active) customShares[id] = amountPerPerson;
         break;
+      case 'Shares':
+      // وقتی متد تغییر می‌کند، نیازی به تنظیم مقدار اولیه نیست (قبلاً 1.0 است)
+        shareCounts.refresh();
+        break;
       default:
         break;
     }
+    // Refresh observables
     customShares.refresh();
+    shareCounts.refresh();
   }
 
-  Future<void> saveExpense() async {
+  Future<void> saveExpense(BuildContext context) async {
     if (isLoading.value) return;
 
     if (!isSplitValid) {
@@ -136,9 +157,12 @@ class GroupExpenseSplitController extends GetxController {
 
     try {
       await addExpenseUseCase(expense);
-      AppLogger.i('Expense saved successfully in group $groupId');
+      AppLogger.i('Expense saved in group $groupId');
       ErrorHandler.showSuccess('Success', 'Expense added successfully');
-      Get.back(result: true);
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (context.mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (e, stack) {
       AppLogger.e('Failed to save expense', e, stack);
       final message = ErrorHandler.getUserFriendlyException(e);

@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import '../../../../core/util/error_handler.dart';
 import '../../../settelment/presentation/pages/advance_settlment_screen.dart';
 import '../controller/group_controller.dart';
-import '../pages/split_method.dart';
+import '../pages/group_expense_spilit_screen.dart';
 
 class GroupActionsWidget extends StatelessWidget {
   final GroupsController controller;

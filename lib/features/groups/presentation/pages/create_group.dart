@@ -7,7 +7,6 @@ import '../../../auth/data/repository/authentication_repository.dart';
 import '../../domain/entities/group.dart';
 import '../../domain/entities/group_setting.dart';
 import '../controller/group_controller.dart';
-import 'select_member_screen.dart';
 import 'groups_details_page.dart';
 
 class CreateNewGroupScreen extends StatefulWidget {
@@ -43,7 +42,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
   File? _selectedImage;
   bool _isCreating = false;
 
-  // Store selected members (as Map<String, dynamic> to be compatible with controller)
+  // Store selected members
   List<Map<String, dynamic>> _selectedMembers = [];
 
   @override
@@ -84,21 +83,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     _memberController.clear();
   }
 
-  Future<void> _openContactsPicker() async {
-    // Navigate to SelectMembersScreen and wait for result
-    final result = await Get.to<List<Map<String, dynamic>>>(() => const SelectMembersScreen());
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        for (var member in result) {
-          final exists = _selectedMembers.any((m) => m['uid'] == member['uid']);
-          if (!exists) {
-            _selectedMembers.add(member);
-          }
-        }
-      });
-      ErrorHandler.showSuccess('Members Added', '${result.length} member(s) selected');
-    }
-  }
+
 
   void _removeSelectedMember(int index) {
     setState(() {
@@ -125,8 +110,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
     setState(() => _isCreating = true);
 
     try {
-      // Build group entity
-      final newGroup = GroupEntity(
+        final newGroup = GroupEntity(
         id: '',
         name: groupName,
         membersCount: _selectedMembers.length + 1,
@@ -147,8 +131,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
       // Create group (with optional image)
       final groupId = await controller.createNewGroup(
         newGroup,
-        imageFile: _selectedImage,
-      );
+          );
 
       if (groupId == null) throw Exception('Group creation failed');
 
@@ -160,10 +143,6 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
           await controller.addMemberToGroup(groupId, identifier, name);
         }
       }
-
-      // Add creator as member (already done in repository, but ensure)
-      // Optionally, add creator to the list if not already there (but repository does it)
-
       AppLogger.i('Group created successfully: $groupId');
       ErrorHandler.showSuccess('Success', 'Group created successfully');
 
@@ -213,7 +192,7 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
             _buildCategorySelector(),
             const SizedBox(height: 32),
             _buildCurrencySelector(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 15),
             _buildMemberSection(),
             const SizedBox(height: 40),
             _buildSubmitButton(),
@@ -348,22 +327,13 @@ class _CreateNewGroupScreenState extends State<CreateNewGroupScreen> {
 
   Widget _buildMemberSection() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Group Members',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            TextButton.icon(
-              onPressed: _openContactsPicker,
-              icon: const Icon(Icons.contacts, size: 18),
-              label: const Text("Select Contact"),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+        Text('Add Member',style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 15
+        ),),
+        const SizedBox(height: 10,),
         TextField(
           controller: _memberController,
           decoration: InputDecoration(

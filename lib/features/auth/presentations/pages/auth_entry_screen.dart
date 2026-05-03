@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../../core/util/error_handler.dart';
+import '../../data/repository/authentication_repository.dart';
 import '../widgets/login_controller.dart';
 import 'email_auth_screen.dart';
 
 class AuthEntryScreen extends StatelessWidget {
   const AuthEntryScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(SignInController());
+      final controller = Get.find<SignInController>();
+    final authRepo = Get.find<AuthenticationRepository>();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -17,23 +21,30 @@ class AuthEntryScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Header section with logo and title
               _buildHeader(),
               const SizedBox(height: 50),
-              // Social login buttons
-              _buildSocialButton(
+              Obx(() => _buildSocialButton(
                 label: 'Continue with Google',
                 icon: Icons.g_mobiledata_rounded,
-                // In real project, use image instead
                 color: Colors.red,
-                onTap: () => controller.loginWithGoogle(),
-              ),
+                isLoading: authRepo.isSubmitting.value,
+                onTap: () async {
+                  try {
+                    final success = await controller.loginWithGoogle();
+                    if (success && context.mounted) {
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    }
+                  } catch (e) {
+                    ErrorHandler.handleError('Error', e.toString());
+                  }
+                },
+              )),
               const SizedBox(height: 20),
               _buildSocialButton(
                 label: 'Continue with Email',
                 icon: Icons.email_outlined,
-                // In real project, use image instead
-                color: Colors.red,
+                color: Colors.blue,
+                isLoading: false,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -48,7 +59,6 @@ class AuthEntryScreen extends StatelessWidget {
     );
   }
 
-  // Header with logo and text
   Widget _buildHeader() {
     return Column(
       children: [
@@ -59,35 +69,27 @@ class AuthEntryScreen extends StatelessWidget {
             color: const Color(0xFF1D5CFF),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Icon(
-            Icons.menu_book_rounded,
-            color: Colors.white,
-            size: 40,
-          ),
+          child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 40),
         ),
         const SizedBox(height: 24),
         const Text(
           'Master Your Debt',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF101828),
-          ),
+          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF101828)),
         ),
         const SizedBox(height: 8),
         const Text(
-          'Manage, split and track with ease.',
+          'Split, track and manage expenses with ease.',
           style: TextStyle(fontSize: 16, color: Colors.blueGrey),
         ),
       ],
     );
   }
 
-  // Social login button builder
   Widget _buildSocialButton({
     required String label,
     required IconData icon,
     required Color color,
+    required bool isLoading,
     required VoidCallback onTap,
   }) {
     return Container(
@@ -98,18 +100,19 @@ class AuthEntryScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
-        onTap: onTap,
+        onTap: isLoading ? null : onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 25),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ],
+        child: Center(
+          child: isLoading
+              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 25),
+              const SizedBox(width: 12),
+              Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ),
       ),
     );

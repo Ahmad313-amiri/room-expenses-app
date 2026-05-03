@@ -28,30 +28,38 @@ class ActivityModel {
     this.status,
   });
 
-  factory ActivityModel.fromExpense(DocumentSnapshot doc) {
+  factory ActivityModel.fromExpense(DocumentSnapshot doc, String groupId) {
     final data = doc.data() as Map<String, dynamic>;
+
+    // Safe timestamp conversion – اگر null بود از زمان فعلی استفاده کن
+    final timestamp = data['date'] as Timestamp?;
+    final date = timestamp?.toDate() ?? DateTime.now();
 
     return ActivityModel(
       id: doc.id,
-      groupId: data['groupId'] ?? '',
+      groupId: groupId,
       type: "expense",
-      date: (data['date'] as Timestamp).toDate(),
+      date: date,
       description: data['description'],
       createdBy: data['createdBy'],
+      amount: (data['amount'] as num?)?.toDouble(),
     );
   }
 
-  factory ActivityModel.fromSettlement(DocumentSnapshot doc) {
+  factory ActivityModel.fromSettlement(DocumentSnapshot doc, String groupId) {
     final data = doc.data() as Map<String, dynamic>;
+
+    final timestamp = data['date'] as Timestamp?;
+    final date = timestamp?.toDate() ?? DateTime.now();
 
     return ActivityModel(
       id: doc.id,
-      groupId: data['groupId'] ?? '',
+      groupId: groupId,
       type: "settlement",
-      date: (data['date'] as Timestamp).toDate(),
+      date: date,
       from: data['from'],
       to: data['to'],
-      amount: (data['amount'] as num).toDouble(),
+      amount: (data['amount'] as num?)?.toDouble(),
       status: data['status'] ?? 'pending',
     );
   }
@@ -60,9 +68,7 @@ class ActivityModel {
     return Activity(
       id: id,
       groupId: groupId,
-      type: type == "expense"
-          ? ActivityType.expense
-          : ActivityType.settlement,
+      type: type == "expense" ? ActivityType.expense : ActivityType.settlement,
       date: date,
       description: description,
       createdBy: createdBy,

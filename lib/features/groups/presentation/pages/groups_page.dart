@@ -47,19 +47,57 @@ class GroupsPage extends StatelessWidget {
             child: RefreshIndicator(
               onRefresh: () => controller.refreshGroups(),
               child: Obx(() {
-                if (controller.isLoading.value && controller.groups.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
+                // نمایش خطا (اگر خطایی وجود داشته باشد و لیست خالی باشد)
+                if (controller.groups.isEmpty && controller.errorMessage.isNotEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.red, size: 64),
+                          const SizedBox(height: 16),
+                          Text(
+                            controller.errorMessage.value,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.red, fontSize: 16),
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                            onPressed: () => controller.refreshGroups(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 }
+
+                // در حال بارگذاری اولیه – نمایش placeholder (اسکلت)
+                if (controller.isLoading.value && controller.groups.isEmpty) {
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 3,
+                    itemBuilder: (context, index) => const ShimmerGroupCard(),
+                  );
+                }
+
+                // بعد از بارگذاری، اگر لیست خالی بود
                 if (controller.groups.isEmpty) {
                   return const GroupsNotFound();
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: controller.groups.length,
-                  itemBuilder: (context, index) {
-                    final group = controller.groups[index];
-                    return _buildGroupCard(group);
-                  },
+
+                // نمایش لیست واقعی گروه‌ها با padding پایین برای اسکرول کامل
+                return Scrollbar(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                    itemCount: controller.groups.length,
+                    itemBuilder: (context, index) {
+                      final group = controller.groups[index];
+                      return _buildGroupCard(group);
+                    },
+                  ),
                 );
               }),
             ),
@@ -90,7 +128,6 @@ class GroupsPage extends StatelessWidget {
   }
 
   Widget _buildGroupCard(dynamic group) {
-    // پشتیبانی از coverImageUrl برای نمایش عکس واقعی گروه
     final hasCoverImage = group.coverImageUrl != null &&
         group.coverImageUrl is String &&
         group.coverImageUrl.isNotEmpty;
@@ -166,6 +203,98 @@ class GroupsPage extends StatelessWidget {
                   ),
                 ),
                 child: const Text('View Details'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ShimmerGroupCard extends StatelessWidget {
+  const ShimmerGroupCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 80,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: List.generate(
+                  3,
+                      (index) => Container(
+                    width: 28,
+                    height: 28,
+                    margin: const EdgeInsets.only(right: 4),
+                    decoration: const BoxDecoration(
+                      color: Colors.grey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 100,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ],
           ),

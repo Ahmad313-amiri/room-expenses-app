@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:roomly/features/groups/presentation/pages/groups_page.dart';
 import 'package:roomly/features/home/presentation/pages/activity_page.dart';
 import 'package:roomly/features/home/presentation/pages/main_dashboard.dart';
-import 'package:roomly/features/home/presentation/pages/setting_page.dart';
+import 'package:roomly/settings/setting_page.dart';
 import 'botton_nav_bar.dart';
 import 'controller/home_page_controller.dart';
 

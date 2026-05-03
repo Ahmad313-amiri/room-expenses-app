@@ -1,5 +1,3 @@
-// lib/features/activity/presentation/screens/activity_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -9,7 +7,6 @@ import '../../../../core/util/app_logger.dart';
 import '../../../../core/util/error_handler.dart';
 import '../../../activity/presentation/controller/activity_controller.dart';
 import '../../../groups/presentation/controller/group_controller.dart';
-
 
 class ActivityScreen extends StatefulWidget {
   final String? groupId;
@@ -73,8 +70,20 @@ class _ActivityScreenState extends State<ActivityScreen>
     ever(groupsController.groups, (List groups) {
       if (groups.isNotEmpty && !_initialLoadDone && mounted) {
         _loadInitialData();
+      } else if (groups.isEmpty && !_initialLoadDone && mounted) {
+        _finishLoadingWithoutData();
       }
     });
+  }
+  void _finishLoadingWithoutData() {
+    if (mounted) {
+      setState(() {
+        _expenseLoading = false;
+        _settlementLoading = false;
+        _summaryLoading = false;
+        _initialLoadDone = true;
+      });
+    }
   }
 
   @override
@@ -86,11 +95,19 @@ class _ActivityScreenState extends State<ActivityScreen>
   Future<void> _loadInitialData() async {
     if (_initialLoadDone) return;
     _initialLoadDone = true;
-
     await _loadMembers();
-    await _loadExpenses();
-    await _loadSettlements();
-    await _loadSummary();
+    await Future.wait([
+      _loadExpenses(),
+      _loadSettlements(),
+      _loadSummary(),
+    ]);
+    if (mounted) {
+      setState(() {
+        if (_expenses.isEmpty) _expenseLoading = false;
+        if (_settlements.isEmpty) _settlementLoading = false;
+        if (_summaries.isEmpty) _summaryLoading = false;
+      });
+    }
   }
 
   // ==========================================================
@@ -106,6 +123,8 @@ class _ActivityScreenState extends State<ActivityScreen>
     }
 
     final groups = groupsController.groups;
+    if (groups.isEmpty) return;
+
     await Future.wait(
       groups.map((group) => _fetchMembers(group.id, storeUnder: group.id)),
     );
@@ -169,6 +188,10 @@ class _ActivityScreenState extends State<ActivityScreen>
         await _fetchExpenses(grpId: groupId!, storeUnder: groupId!, target: temp);
       } else {
         final groups = groupsController.groups;
+        if (groups.isEmpty) {
+            if (mounted) setState(() => _expenseLoading = false);
+          return;
+        }
         await Future.wait(
           groups.map((group) => _fetchExpenses(
             grpId: group.id,
@@ -290,6 +313,10 @@ class _ActivityScreenState extends State<ActivityScreen>
         await _fetchSettlements(grpId: groupId!, storeUnder: groupId!, target: temp);
       } else {
         final groups = groupsController.groups;
+        if (groups.isEmpty) {
+          if (mounted) setState(() => _settlementLoading = false);
+          return;
+        }
         await Future.wait(
           groups.map((group) => _fetchSettlements(
             grpId: group.id,
@@ -395,6 +422,11 @@ class _ActivityScreenState extends State<ActivityScreen>
 
     try {
       final groups = groupsController.groups;
+      if (groups.isEmpty) {
+        if (mounted) setState(() => _summaryLoading = false);
+        return;
+      }
+
       final List<GroupSummary> tempSummaries = [];
 
       for (final group in groups) {
@@ -473,7 +505,7 @@ class _ActivityScreenState extends State<ActivityScreen>
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.only(left: 6,right: 6,top: 5,bottom: 0),
+          padding: const EdgeInsets.only(left: 6, right: 6, top: 5, bottom: 0),
           child: Column(
             children: [
               TabBar(

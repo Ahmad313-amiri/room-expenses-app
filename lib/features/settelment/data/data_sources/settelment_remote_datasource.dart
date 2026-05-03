@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../../../../core/util/app_logger.dart';
 import '../../../../core/util/error_handler.dart';
 
@@ -41,7 +40,7 @@ class SettlementRemoteDataSource {
         ...data,
         'id': id,
         'date': FieldValue.serverTimestamp(),
-        'status': 'completed', // V1: always completed
+        'status': 'completed',
         'type': 'settlement',
       }).timeout(const Duration(seconds: 15));
 
@@ -52,7 +51,6 @@ class SettlementRemoteDataSource {
     }
   }
 
-  /// (Optional) Stream of settlements for a group - if needed in future.
   Stream<QuerySnapshot> watchSettlements(String groupId) {
     return firestore
         .collection('groups')
